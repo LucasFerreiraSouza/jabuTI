@@ -1,6 +1,6 @@
 function criarBotoes() {
     const itens = document.querySelectorAll("li")
-    const conteudos = ["Texto", "Vídeo", "Código"]
+    const conteudos = ["Texto", "Vídeo", "Código","Execercíos"]
 
     itens.forEach(li => {
         conteudos.forEach(valor => {
