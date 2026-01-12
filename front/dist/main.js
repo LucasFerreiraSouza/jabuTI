@@ -1,4 +1,4 @@
-function criarBotoes() {
+const criarBotoes = () => {
     const itens = document.querySelectorAll("li")
     const conteudos = ["Texto", "Vídeo", "Código","Execercío"]
 
