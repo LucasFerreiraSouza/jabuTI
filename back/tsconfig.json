@@ -5,8 +5,12 @@
     "moduleResolution": "node",
     "strict": true,
     "esModuleInterop": true,
-    "types": ["node"],
-    "skipLibCheck": true
+    "skipLibCheck": true,
+
+    "typeRoots": [
+      "./node_modules/@types",
+      "./@types"
+    ]
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "**/*.d.ts"]
 }

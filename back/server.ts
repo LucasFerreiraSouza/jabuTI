@@ -1,38 +1,28 @@
-/* Carrega as variáveis de ambiente do arquivo .env */
 import 'dotenv/config';
-
-/* Importa o Express para criar o servidor HTTP */
 import express from 'express';
-
-/* Importa a função de conexão com o banco */
 import connectDB from './config/db';
 
-/* Importa as rotas da aplicação */
-import usuariosRoutes from './routes/usuarios.route';
-import aulasRoutes from './routes/aulas.route';
+/* importa o index das rotas */
+import apiRoutes from './routes';
 
-/* Cria a aplicação Express */
 const app = express();
-
-/* Porta do servidor (usa .env ou padrão 3000) */
 const PORT = process.env.PORT || 3000;
 
-/* Conecta no banco de dados */
+/* conecta no banco */
 connectDB();
 
-/* Middleware para permitir JSON no body das requisições */
+/* middleware JSON */
 app.use(express.json());
 
-/* Rotas */
-app.use('/usuarios', usuariosRoutes);
-app.use('/aulas', aulasRoutes);
+/* 🔥 PREFIXO GLOBAL /api */
+app.use('/api', apiRoutes);
 
-/* Rota de teste (opcional) */
+/* health check */
 app.get('/', (_req, res) => {
   res.send('🟢 API jabuTI rodando');
 });
 
-/* Inicia o servidor */
+/* inicia servidor */
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
 });
