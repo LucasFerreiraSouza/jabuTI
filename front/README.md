@@ -1,77 +1,242 @@
-# React + TypeScript + Vite
+# 🐢 jabuTI – Front-end
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Front-end da aplicação **jabuTI**, desenvolvido em **React + TypeScript** utilizando **Vite**.
 
-Currently, two official plugins are available:
+Projeto focado em **organização de pastas**, **componentização**, **consumo de API**, **autenticação com JWT**, **SCSS Modules** e **boas práticas de front-end moderno**.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## 🛠️ Stack
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+* React
+* TypeScript
+* Vite
+* Axios
+* React Router DOM
+* Context API
+* SCSS Modules
+* ESLint
 
-Note: This will impact Vite dev & build performances.
+---
 
-## Expanding the ESLint configuration
+## 🧱 Criação do projeto
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+O projeto foi inicializado utilizando o **Vite** com template **React + TypeScript**:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm create vite@latest front -- --template react-ts
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Após a criação:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd front
+npm install
 ```
 
+---
+
+## 📁 Estrutura do projeto
+
+```txt
+front/
+├── public/
+│   └── vite.svg
+│
+├── src/
+│   ├── api/
+│   │   └── http.ts
+│   │
+│   ├── components/
+│   │   ├── AulaCard/
+│   │   │   ├── AulaCard.tsx
+│   │   │   ├── AulaCard.module.scss
+│   │   │   └── AulaCard.test.tsx
+│   │   └── Modal/
+│   │       ├── Modal.tsx
+│   │       ├── Modal.module.scss
+│   │       └── Modal.test.tsx
+│   │
+│   ├── contexts/
+│   │   └── AuthContext.tsx
+│   │
+│   ├── hooks/
+│   │   └── useAuth.ts
+│   │
+│   ├── pages/
+│   │   ├── Login/
+│   │   │   ├── Login.tsx
+│   │   │   ├── Login.module.scss
+│   │   │   └── Login.test.tsx
+│   │   └── Aulas/
+│   │       ├── Aulas.tsx
+│   │       ├── Aulas.module.scss
+│   │       └── Aulas.test.tsx
+│   │
+│   ├── services/
+│   │   ├── aulas.service.ts
+│   │   └── usuarios.service.ts
+│   │
+│   ├── styles/
+│   │   ├── _variables.scss
+│   │   ├── _mixins.scss
+│   │   └── global.scss
+│   │
+│   ├── test/
+│   │   └── setup.ts
+│   │
+│   ├── types/
+│   │   ├── aulas.type.ts
+│   │   └── usuarios.type.ts
+│   │
+│   ├── utils/
+│   │   └── storage.ts
+│   │
+│   ├── App.tsx
+│   └── main.tsx
+│
+├── index.html
+├── vite.config.ts
+├── tsconfig.json
+├── package.json
+└── eslint.config.js
+```
+
+---
+
+## 🚀 Como rodar o projeto
+
+### 1️⃣ Instalar dependências
+
+```bash
+npm install
+```
+
+---
+
+### 2️⃣ Executar em ambiente de desenvolvimento
+
+```bash
+npm run dev
+```
+
+A aplicação estará disponível em:
+
+```
+http://localhost:5173
+```
+
+---
+
+## 🧪 Testes (Vitest)
+
+### Instalação
+
+```bash
+npm install -D vitest @testing-library/react @testing-library/jest-dom jsdom
+npm install -D @types/vitest
+```
+
+### Configuração
+
+No arquivo `vite.config.ts`:
+
+```ts
+import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test/setup.ts',
+  },
+});
+```
+
+### Setup global
+
+Crie o arquivo:
+
+```txt
+src/test/setup.ts
+```
+
+Com o conteúdo:
+
+```ts
+import '@testing-library/jest-dom';
+```
+
+### Scripts
+
+No `package.json`:
+
+```json
+"scripts": {
+  "dev": "vite",
+  "build": "vite build",
+  "preview": "vite preview",
+  "test": "vitest",
+  "test:ui": "vitest --ui",
+  "test:run": "vitest run"
+}
+```
+
+---
+
+## 🔗 Integração com o back-end
+
+O front consome a API do **jabuTI Back-end**.
+
+Configuração do Axios:
+
+```txt
+src/api/http.ts
+```
+
+Exemplo:
+
+```ts
+import axios from 'axios';
+
+export const api = axios.create({
+  baseURL: 'http://localhost:3000',
+});
+```
+
+---
+
+## 🔐 Autenticação
+
+* Autenticação baseada em **JWT**
+* Token armazenado no **localStorage**
+* Gerenciamento via **Context API**
+* Hook customizado `useAuth` para acesso ao contexto
+
+---
+
+## 🎨 Estilização
+
+* **SCSS Modules** para escopo local de estilos
+* Estilos globais em `styles/global.scss`
+* Variáveis e mixins reutilizáveis
+
+---
+
+## 🎯 Objetivos do projeto
+
+* Consolidar React + TypeScript
+* Aplicar arquitetura de front-end escalável
+* Consumir API REST autenticada
+* Trabalhar com Context API e hooks customizados
+* Utilizar SCSS Modules
+* Criar um projeto com padrão de mercado para portfólio
+
+---
+
+## 📄 Observações
+
+Projeto desenvolvido com fins educacionais, seguindo padrões utilizados em aplicações reais.
 
