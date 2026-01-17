@@ -1,6 +1,8 @@
 /* Importa os tipos Request e Response do Express
    Eles representam a requisição que chega e a resposta que será enviada */
 import { Request, Response } from 'express';
+import Aula from '../models/aulas.model';
+
 
 /* Importa a lib de JWT */
 import jwt from 'jsonwebtoken';
@@ -50,16 +52,13 @@ export const criarUsuario = async (req: Request, res: Response) => {
   try {
     const { nome, email, senha } = req.body;
 
-    /* Validação básica
-       Evita spam, dados vazios e abuso da rota */
+    /* Validação básica */
     if (!nome || !email || !senha) {
       return res.status(400).json({
         erro: 'Nome, email e senha são obrigatórios'
       });
     }
 
-    /* Verifica se o email já existe
-       Evita criação infinita do mesmo usuário */
     const usuarioExiste = await Usuario.findOne({ email });
 
     if (usuarioExiste) {
@@ -68,17 +67,15 @@ export const criarUsuario = async (req: Request, res: Response) => {
       });
     }
 
-    /* ⚠️ Aqui futuramente entra bcrypt
-       senha: await bcrypt.hash(senha, 10) */
     const novoUsuario = await Usuario.create({
       nome,
       email,
       senha
     });
 
-    /* Nunca retorne a senha */
+    /* Retorna o usuário completo (sem senha) */
     return res.status(201).json({
-      id: novoUsuario._id,
+      _id: novoUsuario._id,
       nome: novoUsuario.nome,
       email: novoUsuario.email
     });
@@ -128,6 +125,9 @@ export const deletarUsuario = async (req: Request, res: Response) => {
       return res.status(404).json({ erro: 'Usuário não encontrado' });
     }
 
+    // Deleta todas as aulas do usuário
+    await Aula.deleteMany({ criadoPor: id });
+
     return res.status(200).json({
       mensagem: 'Usuário removido com sucesso'
     });
@@ -136,6 +136,7 @@ export const deletarUsuario = async (req: Request, res: Response) => {
   }
 };
 
+
 /* ============================
    LOGIN DO USUÁRIO
    ============================ */
@@ -143,24 +144,16 @@ export const login = async (req: Request, res: Response) => {
   try {
     const { email, senha } = req.body;
 
-    /* Validação básica */
     if (!email || !senha) {
-      return res.status(400).json({
-        erro: 'Email e senha são obrigatórios'
-      });
+      return res.status(400).json({ erro: 'Email e senha são obrigatórios' });
     }
 
     const usuario = await Usuario.findOne({ email });
 
-    /* Mensagem genérica por segurança
-       (não revela se o email existe) */
     if (!usuario || usuario.senha !== senha) {
-      return res.status(401).json({
-        erro: 'Email ou senha inválidos'
-      });
+      return res.status(401).json({ erro: 'Email ou senha inválidos' });
     }
 
-    /* Gera token JWT */
     const token = jwt.sign(
       { id: usuario._id },
       process.env.JWT_SECRET as string,
@@ -169,16 +162,20 @@ export const login = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       usuario: {
-        id: usuario._id,
+        _id: usuario._id,
         nome: usuario.nome,
         email: usuario.email
       },
       token
     });
-  } catch {
+
+  } catch (error) {
+    console.error(error);
     return res.status(500).json({ erro: 'Erro no login' });
   }
 };
+
+
 
 /* ============================
    LOGOUT (JWT)

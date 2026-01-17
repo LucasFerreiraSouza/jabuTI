@@ -12,5 +12,5 @@
       "./@types"
     ]
   },
-  "include": ["**/*.ts", "**/*.d.ts"]
+  "include": ["**/*.ts", "**/*.d.ts", "jest.config.js"]
 }

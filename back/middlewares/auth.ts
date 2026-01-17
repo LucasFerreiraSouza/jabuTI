@@ -1,8 +1,9 @@
 import { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AuthRequest } from '../types/AuthRequest';
+import Usuario from '../models/usuarios.model';
 
-const auth = (req: AuthRequest, res: Response, next: NextFunction) => {
+const auth = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
@@ -15,16 +16,25 @@ const auth = (req: AuthRequest, res: Response, next: NextFunction) => {
     return res.status(401).json({ erro: 'Token mal formatado' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET as string, (err, decoded: any) => {
-    if (err) {
-      return res.status(401).json({ erro: 'Token inválido' });
+  if (!process.env.JWT_SECRET) {
+    return res.status(500).json({ erro: 'JWT_SECRET não configurado' });
+  }
+
+  try {
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET);
+
+    // ❗️ Verifica se o usuário ainda existe no banco
+    const usuario = await Usuario.findById(decoded.id);
+
+    if (!usuario) {
+      return res.status(401).json({ erro: 'Usuário não existe mais' });
     }
 
-    // aqui ele PASSA a existir
     req.userId = decoded.id;
-
     return next();
-  });
+  } catch (err) {
+    return res.status(401).json({ erro: 'Token inválido' });
+  }
 };
 
 export default auth;

@@ -58,9 +58,11 @@ export const criarAula = async (req: Request, res: Response) => {
       codigo,
       exercicio,
       imagem,
-      criadoPor,
       publicada
     } = req.body;
+
+    // pega o usuário logado pelo token
+    const criadoPor = (req as any).userId;
 
     /* Validação mínima
        Evita salvar aula incompleta */
@@ -94,10 +96,12 @@ export const criarAula = async (req: Request, res: Response) => {
 
     /* Retorna a aula criada */
     return res.status(201).json(novaAula);
-  } catch {
+  } catch (err) {
+    console.error(err);
     return res.status(500).json({ erro: 'Erro ao criar aula' });
   }
 };
+
 
 /* ============================
    ATUALIZAR AULA
