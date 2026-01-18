@@ -192,7 +192,7 @@ export const resetarEmail = async (req: Request, res: Response) => {
     const usuario = await Usuario.findOne({
       tokenResetEmail: token,
       resetEmailExpira: { $gt: new Date() }
-    }).select('+tokenResetEmail');
+    }).select('+tokenResetEmail +novoEmail'); // <-- aqui
 
     if (!usuario || !usuario.novoEmail) {
       return res.status(400).json({ erro: 'Token inválido ou expirado' });
@@ -212,6 +212,7 @@ export const resetarEmail = async (req: Request, res: Response) => {
     return res.status(500).json({ erro: 'Erro ao alterar email' });
   }
 };
+
 
 export const ativarSenha = async (req: Request, res: Response) => {
   try {
