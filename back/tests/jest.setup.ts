@@ -24,8 +24,7 @@ export const clearTestDB = async () => {
   }
 };
 
-// ✨ ESSA PARTE É IMPORTANTE ✨
-// Ela faz o Jest executar automaticamente antes/depois dos testes
+// 🔥 Jest hooks
 beforeAll(async () => {
   await connectTestDB();
 });
@@ -38,7 +37,7 @@ afterAll(async () => {
   await disconnectTestDB();
 });
 
-// ✨ MOCKS ✨
+// MOCKS
 jest.mock('nodemailer', () => ({
   createTransport: jest.fn().mockReturnValue({
     sendMail: jest.fn().mockResolvedValue({ messageId: 'fake-id' })

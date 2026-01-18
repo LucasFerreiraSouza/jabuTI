@@ -1,6 +1,6 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  setupFiles: ['dotenv/config'],
-  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts']
+  setupFilesAfterEnv: ['./tests/jest.setup.ts'],
+  testMatch: ['**/tests/**/*.test.ts'],
 };

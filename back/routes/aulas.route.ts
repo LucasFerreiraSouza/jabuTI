@@ -4,7 +4,7 @@ import { Router } from 'express';
 
 /* Importa o middleware de autenticação.
    Ele verifica se o usuário está logado (token JWT válido) */
-import auth from '../middlewares/auth';
+import {auth} from '../middlewares/auth';
 
 /* Importa as funções do controller de aulas.
    Cada função é responsável por executar uma ação */

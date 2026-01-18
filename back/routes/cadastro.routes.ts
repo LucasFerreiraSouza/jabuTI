@@ -6,7 +6,7 @@ import {
   resetarSenha,
   solicitarResetEmail,
   resetarEmail
-} from '../controllers/usuarios.controller';
+} from '../controllers/cadastro.controller';
 
 const router = Router();
 

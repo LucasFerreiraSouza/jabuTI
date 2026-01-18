@@ -9,7 +9,7 @@ import {
   reprovarUsuario,
   promoverAdmin,
   despromoverAdmin
-} from '../controllers/usuarios.controller';
+} from '../controllers/admin.controller';
 
 import { auth } from '../middlewares/auth';
 import { adminOnly } from '../middlewares/adminOnly';

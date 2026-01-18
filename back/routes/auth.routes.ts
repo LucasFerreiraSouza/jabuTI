@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { login, confirmarCodigo, logout, habilitar2FA, desabilitar2FA } from '../controllers/usuarios.controller';
+import { login, confirmarCodigo, logout, habilitar2FA, desabilitar2FA } from '../controllers/auth.controller';
 import { auth } from '../middlewares/auth';
 
 const router = Router();
