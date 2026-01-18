@@ -1,52 +1,152 @@
-/* Importa o Schema e o model do Mongoose.
-   - Schema define a estrutura do documento
-   - model cria o modelo que conversa com o banco */
-import { Schema, model } from 'mongoose';
+import { Schema, model, Document } from 'mongoose';
 
-/* Cria o schema do usuário.
-   Aqui definimos como um usuário será salvo no MongoDB */
-const UsuarioSchema = new Schema(
+interface IUsuario extends Document {
+  nome: string;
+  email: string;
+  senha?: string | null;
+  role: 'ESTUDANTE' | 'ADMIN';
+  status: 'PENDENTE' | 'APROVADO' | 'REPROVADO';
+
+  doisFatoresAtivo: boolean;
+
+  codigo2FA?: string;
+  codigo2FAExpira?: Date;
+  tentativas2FA: number;
+
+  tentativasLogin: number;
+  bloqueioLoginExpira?: Date;
+  bloqueio2FAExpira?: Date;
+
+  tokenAtivacaoSenha?: string;
+  tokenAtivacaoExpira?: Date;
+
+  tokenResetSenha?: string | null;
+  resetSenhaExpira?: Date | null;
+
+  tokenResetEmail?: string | null;
+  resetEmailExpira?: Date | null;
+
+  novoEmail?: string | null;
+
+  ultimoLogin?: Date;
+}
+
+const UsuarioSchema = new Schema<IUsuario>(
   {
-    /* Nome do usuário
-       type: tipo do dado
-       required: campo obrigatório */
     nome: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
 
-    /* Email do usuário
-       unique: garante que não existam emails duplicados */
     email: {
       type: String,
       required: true,
-      unique: true
+      unique: true,
+      lowercase: true,
+      trim: true,
+      index: true
     },
 
-    /* Senha do usuário
-       Normalmente essa senha será salva criptografada */
     senha: {
       type: String,
-      required: true
+      select: false
     },
 
-    /* Indica se o usuário é administrador */
-    admin: {
+    role: {
+      type: String,
+      enum: ['ESTUDANTE', 'ADMIN'],
+      default: 'ESTUDANTE',
+      index: true
+    },
+
+    status: {
+      type: String,
+      enum: ['PENDENTE', 'APROVADO', 'REPROVADO'],
+      default: 'PENDENTE',
+      index: true
+    },
+
+    doisFatoresAtivo: {
       type: Boolean,
       default: false
+    },
+
+    codigo2FA: {
+      type: String,
+      select: false
+    },
+
+    codigo2FAExpira: {
+      type: Date,
+      select: false
+    },
+
+    tentativas2FA: {
+      type: Number,
+      default: 0,
+      select: false
+    },
+
+    tentativasLogin: {
+      type: Number,
+      default: 0,
+      select: false
+    },
+
+    bloqueioLoginExpira: {
+      type: Date,
+      select: false
+    },
+
+    bloqueio2FAExpira: {
+      type: Date,
+      select: false
+    },
+
+    tokenAtivacaoSenha: {
+      type: String,
+      select: false
+    },
+
+    tokenAtivacaoExpira: {
+      type: Date,
+      select: false
+    },
+
+    tokenResetSenha: {
+      type: String,
+      select: false
+    },
+
+    resetSenhaExpira: {
+      type: Date,
+      select: false
+    },
+
+    tokenResetEmail: {
+      type: String,
+      select: false
+    },
+
+    resetEmailExpira: {
+      type: Date,
+      select: false
+    },
+
+    novoEmail: {
+      type: String,
+      select: false
+    },
+
+    ultimoLogin: {
+      type: Date
     }
   },
   {
-    /* Adiciona automaticamente:
-       createdAt → data de criação
-       updatedAt → data da última atualização */
-    timestamps: true
+    timestamps: true,
+    versionKey: false
   }
 );
 
-/* Cria o model chamado "Usuario"
-   Esse nome vira a collection "usuarios" no MongoDB */
-const Usuario = model('Usuario', UsuarioSchema);
-
-/* Exporta o model para ser usado nos controllers */
-export default Usuario;
+export default model<IUsuario>('Usuario', UsuarioSchema);

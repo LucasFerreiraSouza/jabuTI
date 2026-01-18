@@ -1,6 +1,6 @@
-export default {
+module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  setupFilesAfterEnv: ['./tests/setup.ts'],
-  testTimeout: 30000, // 30 segundos
+  setupFiles: ['dotenv/config'],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts']
 };
