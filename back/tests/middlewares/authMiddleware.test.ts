@@ -1,10 +1,10 @@
-import { auth } from '../middlewares/auth';
+import { auth } from '../../middlewares/auth';
 import { Response, NextFunction } from 'express';
 import jwt, { TokenExpiredError, JsonWebTokenError } from 'jsonwebtoken';
-import Usuario from '../models/usuarios.model';
+import Usuario from '../../models/usuarios.model';
 
 jest.mock('jsonwebtoken');
-jest.mock('../models/usuarios.model');
+jest.mock('../../models/usuarios.model');
 
 describe('auth middleware', () => {
   let req: any;

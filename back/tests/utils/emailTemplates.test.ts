@@ -1,4 +1,4 @@
-import { emailTemplates } from '../utils/emailTemplates';
+import { emailTemplates } from '../../utils/emailTemplates';
 
 describe('Email Templates', () => {
   it('cadastroRecebido deve retornar subject e html com o nome', () => {

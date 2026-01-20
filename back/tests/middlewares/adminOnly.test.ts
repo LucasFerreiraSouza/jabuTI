@@ -1,4 +1,4 @@
-import { adminOnly } from '../middlewares/adminOnly';
+import { adminOnly } from '../../middlewares/adminOnly';
 import { Response } from 'express';
 
 describe('adminOnly middleware', () => {
