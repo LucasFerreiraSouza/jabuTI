@@ -10,7 +10,7 @@ const router = Router();
 router.use('/auth', authRoutes);
 router.use('/cadastro', cadastroRoutes);
 router.use('/admin', adminRoutes);
-router.use('/aula', aulaRoutes);
+router.use('/aulas', aulaRoutes);
 
 
 export default router;

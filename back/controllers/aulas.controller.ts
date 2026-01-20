@@ -1,6 +1,8 @@
 /* Importa Request e Response do Express
    Representam a requisição e a resposta HTTP */
 import { Request, Response } from 'express';
+import mongoose from "mongoose";
+
 
 /* Importa o model Aula
    Responsável por acessar a collection "aulas" */
@@ -138,22 +140,25 @@ export const atualizarAula = async (req: Request, res: Response) => {
    ============================ */
 export const deletarAula = async (req: Request, res: Response) => {
   try {
-    /* Extrai o ID da URL */
-    const { id } = req.params;
+    const idParam = req.params.id;
 
-    /* Remove a aula do banco */
-    const aulaRemovida = await Aula.findByIdAndDelete(id);
+    // garante que é string
+    const id = Array.isArray(idParam) ? idParam[0] : idParam;
 
-    /* Caso não exista */
-    if (!aulaRemovida) {
-      return res.status(404).json({ erro: 'Aula não encontrada' });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ erro: "ID inválido" });
     }
 
-    /* Retorna mensagem de sucesso */
+    const aulaRemovida = await Aula.findByIdAndDelete(id);
+
+    if (!aulaRemovida) {
+      return res.status(404).json({ erro: "Aula não encontrada" });
+    }
+
     return res.status(200).json({
-      mensagem: 'Aula removida com sucesso'
+      mensagem: "Aula removida com sucesso",
     });
   } catch {
-    return res.status(500).json({ erro: 'Erro ao deletar aula' });
+    return res.status(500).json({ erro: "Erro ao deletar aula" });
   }
 };

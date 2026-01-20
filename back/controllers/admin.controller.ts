@@ -132,7 +132,8 @@ export const aprovarUsuario = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const usuario = await Usuario.findById(id);
+    const usuario = await Usuario.findById(id)
+      .select("+tokenAtivacaoSenha +tokenAtivacaoExpira");
 
     if (!usuario) {
       return res.status(404).json({ erro: 'Usuário não encontrado' });
@@ -179,6 +180,7 @@ export const aprovarUsuario = async (req: Request, res: Response) => {
     });
   }
 };
+
 
 export const reprovarUsuario = async (req: Request, res: Response) => {
   try {

@@ -31,6 +31,7 @@
   "scripts": {
     "dev": "ts-node server.ts",
     "test": "jest --runInBand",
+    "coverage": "jest --coverage",
     "test:brevo": "ts-node utils/brevoTest.ts",
     "test:admin":"ts-node seeds/create-admin.ts"
   }
