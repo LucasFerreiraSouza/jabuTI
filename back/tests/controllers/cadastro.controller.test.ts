@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 
 import Usuario from '../../models/usuarios.model';
 import { emailService } from '../../utils/emailService';
@@ -17,24 +18,24 @@ import {
 
 jest.mock('../../utils/reCaptcha');
 jest.mock('../../utils/emailService');
-jest.mock('../../models/usuarios.model');
 jest.mock('../../utils/senha');
 jest.mock('bcrypt');
+
+// NÃO COLOQUE O MOCK AQUI
+jest.mock('../../models/usuarios.model');
 
 describe('cadastro.controller', () => {
   let req: any;
   let res: Partial<Response>;
 
   beforeEach(() => {
+    jest.resetAllMocks();
+
     req = { body: {} };
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn()
     };
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
   });
 
   // =========================
@@ -57,6 +58,18 @@ describe('cadastro.controller', () => {
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith({ erro: 'Captcha inválido' });
+  });
+
+  test('deve retornar 400 se nome ou email não enviados', async () => {
+    req.body = { nome: 'Lucas', captchaToken: 'token' };
+    (validateCaptcha as jest.Mock).mockResolvedValue(true);
+
+    await registrarUsuario(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      erro: 'Nome e email são obrigatórios'
+    });
   });
 
   test('deve retornar 409 se email já cadastrado', async () => {
@@ -86,6 +99,16 @@ describe('cadastro.controller', () => {
     });
   });
 
+  test('deve retornar 500 em registrarUsuario se ocorrer erro', async () => {
+    req.body = { nome: 'Lucas', email: 'email@test.com', captchaToken: 'token' };
+    (validateCaptcha as jest.Mock).mockRejectedValue(new Error('erro'));
+
+    await registrarUsuario(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ erro: 'Erro ao registrar usuário' });
+  });
+
   // =========================
   // solicitarResetSenha
   // =========================
@@ -106,6 +129,16 @@ describe('cadastro.controller', () => {
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith({ erro: 'Captcha inválido' });
+  });
+
+  test('deve retornar 400 se email não enviado', async () => {
+    req.body = { captchaToken: 'token' };
+    (validateCaptcha as jest.Mock).mockResolvedValue(true);
+
+    await solicitarResetSenha(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ erro: 'Email é obrigatório' });
   });
 
   test('deve retornar 200 mesmo se email não existir (segurança)', async () => {
@@ -141,6 +174,17 @@ describe('cadastro.controller', () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
+  test('deve retornar 500 em solicitarResetSenha se ocorrer erro', async () => {
+    req.body = { email: 'email@test.com', captchaToken: 'token' };
+    (validateCaptcha as jest.Mock).mockResolvedValue(true);
+    (Usuario.findOne as jest.Mock).mockRejectedValue(new Error('erro'));
+
+    await solicitarResetSenha(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ erro: 'Erro ao solicitar reset de senha' });
+  });
+
   // =========================
   // resetarSenha
   // =========================
@@ -166,6 +210,20 @@ describe('cadastro.controller', () => {
     });
   });
 
+  test('deve retornar 400 se token inválido em resetarSenha', async () => {
+    req.body = { token: 'token', senha: 'Senha@123' };
+    (validarSenhaForte as jest.Mock).mockReturnValue(true);
+
+    (Usuario.findOne as jest.Mock).mockReturnValue({
+      select: jest.fn().mockResolvedValue(null)
+    });
+
+    await resetarSenha(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ erro: 'Token inválido ou expirado' });
+  });
+
   test('deve resetar senha com sucesso', async () => {
     req.body = { token: 'token', senha: 'Senha@123' };
     (validarSenhaForte as jest.Mock).mockReturnValue(true);
@@ -188,6 +246,8 @@ describe('cadastro.controller', () => {
     });
   });
 
+  
+
   // =========================
   // solicitarResetEmail
   // =========================
@@ -202,13 +262,27 @@ describe('cadastro.controller', () => {
     });
   });
 
+  test('deve retornar 200 se usuário não existir em reset email', async () => {
+    req.body = { email: 'email@test.com', novoEmail: 'novo@test.com' };
+
+    (Usuario.findOne as jest.Mock).mockResolvedValue(null);
+
+    await solicitarResetEmail(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      mensagem:
+        'Se este email existir, você receberá um link para confirmar a troca.'
+    });
+  });
+
   test('deve retornar 409 se novoEmail já existe', async () => {
     req.body = { email: 'email@test.com', novoEmail: 'novo@test.com' };
 
     const usuarioMock: any = { save: jest.fn() };
     (Usuario.findOne as jest.Mock)
-      .mockResolvedValueOnce(usuarioMock) // encontra usuário atual
-      .mockResolvedValueOnce({}); // novo email já existe
+      .mockResolvedValueOnce(usuarioMock)
+      .mockResolvedValueOnce({});
 
     await solicitarResetEmail(req, res as Response);
 
@@ -226,14 +300,25 @@ describe('cadastro.controller', () => {
     };
 
     (Usuario.findOne as jest.Mock)
-      .mockResolvedValueOnce(usuarioMock) // encontra usuário atual
-      .mockResolvedValueOnce(null); // novo email não existe
+      .mockResolvedValueOnce(usuarioMock)
+      .mockResolvedValueOnce(null);
 
     await solicitarResetEmail(req, res as Response);
 
     expect(usuarioMock.save).toHaveBeenCalled();
     expect(emailService.resetEmail).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  test('deve retornar 500 em solicitarResetEmail se ocorrer erro', async () => {
+    req.body = { email: 'email@test.com', novoEmail: 'novo@test.com' };
+
+    (Usuario.findOne as jest.Mock).mockRejectedValue(new Error('erro'));
+
+    await solicitarResetEmail(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ erro: 'Erro ao solicitar troca de email' });
   });
 
   // =========================
@@ -252,6 +337,21 @@ describe('cadastro.controller', () => {
     req.body = { token: 'token' };
     (Usuario.findOne as jest.Mock).mockReturnValue({
       select: jest.fn().mockResolvedValue(null)
+    });
+
+    await resetarEmail(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ erro: 'Token inválido ou expirado' });
+  });
+
+  test('deve retornar 400 se token válido mas novoEmail não existe', async () => {
+    req.body = { token: 'token' };
+
+    const usuarioMock: any = { novoEmail: undefined };
+
+    (Usuario.findOne as jest.Mock).mockReturnValue({
+      select: jest.fn().mockResolvedValue(usuarioMock)
     });
 
     await resetarEmail(req, res as Response);
@@ -281,6 +381,8 @@ describe('cadastro.controller', () => {
     });
   });
 
+
+
   // =========================
   // ativarSenha
   // =========================
@@ -308,6 +410,20 @@ describe('cadastro.controller', () => {
     });
   });
 
+  test('deve retornar 400 se token inválido em ativarSenha', async () => {
+    req.body = { token: 'token', senha: 'Senha@123' };
+    (validarSenhaForte as jest.Mock).mockReturnValue(true);
+
+    (Usuario.findOne as jest.Mock).mockReturnValue({
+      select: jest.fn().mockResolvedValue(null)
+    });
+
+    await ativarSenha(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ erro: 'Token inválido ou expirado' });
+  });
+
   test('deve ativar senha com sucesso', async () => {
     req.body = { token: 'token', senha: 'Senha@123' };
     (validarSenhaForte as jest.Mock).mockReturnValue(true);
@@ -329,4 +445,47 @@ describe('cadastro.controller', () => {
       mensagem: 'Senha criada com sucesso. Você já pode fazer login.'
     });
   });
+
+  test('deve retornar 500 em resetarSenha se ocorrer erro', async () => {
+  req.body = { token: 'token', senha: 'Senha@123' };
+  (validarSenhaForte as jest.Mock).mockReturnValue(true);
+
+  (Usuario.findOne as jest.Mock).mockReturnValue({
+    select: jest.fn().mockRejectedValueOnce(new Error('erro'))
+  });
+
+  await resetarSenha(req, res as Response);
+
+  expect(res.status).toHaveBeenCalledWith(500);
+  expect(res.json).toHaveBeenCalledWith({ erro: 'Erro ao resetar senha' });
+});
+
+test('deve retornar 500 em resetarEmail se ocorrer erro', async () => {
+  req.body = { token: 'token' };
+
+  (Usuario.findOne as jest.Mock).mockReturnValue({
+    select: jest.fn().mockRejectedValueOnce(new Error('erro'))
+  });
+
+  await resetarEmail(req, res as Response);
+
+  expect(res.status).toHaveBeenCalledWith(500);
+  expect(res.json).toHaveBeenCalledWith({ erro: 'Erro ao alterar email' });
+});
+
+
+test('deve retornar 500 em ativarSenha se ocorrer erro', async () => {
+  req.body = { token: 'token', senha: 'Senha@123' };
+  (validarSenhaForte as jest.Mock).mockReturnValue(true);
+
+  (Usuario.findOne as jest.Mock).mockReturnValue({
+    select: jest.fn().mockRejectedValueOnce(new Error('erro'))
+  });
+
+  await ativarSenha(req, res as Response);
+
+  expect(res.status).toHaveBeenCalledWith(500);
+  expect(res.json).toHaveBeenCalledWith({ erro: 'Erro ao ativar senha' });
+});
+
 });

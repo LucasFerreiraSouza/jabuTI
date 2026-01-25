@@ -2,7 +2,7 @@ import { Router } from 'express';
 import authRoutes from './auth.routes';
 import cadastroRoutes from './cadastro.routes';
 import adminRoutes from './admin.routes';
-import aulaRoutes from './aulas.route';
+import aulaRoutes from './aulas.routes';
 
 
 const router = Router();

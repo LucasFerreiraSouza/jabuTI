@@ -116,7 +116,7 @@ export const resetarSenha = async (req: Request, res: Response) => {
     const usuario = await Usuario.findOne({
       tokenResetSenha: token,
       resetSenhaExpira: { $gt: new Date() }
-    }).select('+tokenResetSenha');
+    }).select('+tokenResetSenha +resetSenhaExpira');
 
     if (!usuario) {
       return res.status(400).json({ erro: 'Token inválido ou expirado' });
@@ -192,7 +192,7 @@ export const resetarEmail = async (req: Request, res: Response) => {
     const usuario = await Usuario.findOne({
       tokenResetEmail: token,
       resetEmailExpira: { $gt: new Date() }
-    }).select('+tokenResetEmail +novoEmail'); // <-- aqui
+    }).select('+tokenResetEmail +novoEmail');
 
     if (!usuario || !usuario.novoEmail) {
       return res.status(400).json({ erro: 'Token inválido ou expirado' });
@@ -213,7 +213,6 @@ export const resetarEmail = async (req: Request, res: Response) => {
   }
 };
 
-
 export const ativarSenha = async (req: Request, res: Response) => {
   try {
     const { token, senha } = req.body;
@@ -224,7 +223,6 @@ export const ativarSenha = async (req: Request, res: Response) => {
       });
     }
 
-    // validação forte
     if (!validarSenhaForte(senha)) {
       return res.status(400).json({
         erro:
@@ -235,7 +233,7 @@ export const ativarSenha = async (req: Request, res: Response) => {
     const usuario = await Usuario.findOne({
       tokenAtivacaoSenha: token,
       tokenAtivacaoExpira: { $gt: new Date() }
-    }).select('+tokenAtivacaoSenha');
+    }).select('+tokenAtivacaoSenha +tokenAtivacaoExpira');
 
     if (!usuario) {
       return res.status(400).json({
@@ -246,7 +244,7 @@ export const ativarSenha = async (req: Request, res: Response) => {
     usuario.senha = await bcrypt.hash(senha, 10);
     usuario.tokenAtivacaoSenha = undefined;
     usuario.tokenAtivacaoExpira = undefined;
-    usuario.status = 'APROVADO'; // garante que fique aprovado
+    usuario.status = 'APROVADO';
 
     await usuario.save();
 

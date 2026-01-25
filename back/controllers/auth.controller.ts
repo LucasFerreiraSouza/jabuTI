@@ -109,6 +109,16 @@ export const confirmarCodigo = async (req: Request, res: Response) => {
       });
     }
 
+    // 🚀 valida captcha antes de tudo
+    if (!captchaToken) {
+      return res.status(400).json({ erro: 'Captcha é obrigatório' });
+    }
+
+    const captchaOk = await validateCaptcha(captchaToken);
+    if (!captchaOk) {
+      return res.status(401).json({ erro: 'Captcha inválido' });
+    }
+
     const usuario = await Usuario.findById(usuarioId).select(
       '+codigo2FA +codigo2FAExpira +tentativas2FA +bloqueio2FAExpira'
     );
@@ -133,16 +143,6 @@ export const confirmarCodigo = async (req: Request, res: Response) => {
       return res.status(429).json({
         erro: `Muitas tentativas. Tente novamente em ${minutos} minuto(s).`
       });
-    }
-
-    if (!captchaToken) {
-      return res.status(400).json({ erro: 'Captcha é obrigatório' });
-    }
-
-    const captchaOk = await validateCaptcha(captchaToken);
-
-    if (!captchaOk) {
-      return res.status(401).json({ erro: 'Captcha inválido' });
     }
 
     const MAX_TENTATIVAS = 5;
@@ -186,6 +186,7 @@ export const confirmarCodigo = async (req: Request, res: Response) => {
     return res.status(500).json({ erro: 'Erro ao confirmar código' });
   }
 };
+
 
 export const logout = async (_req: Request, res: Response) => {
   return res.status(200).json({

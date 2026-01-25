@@ -18,6 +18,15 @@ describe('auth middleware', () => {
       json: jest.fn()
     };
     next = jest.fn();
+
+    // 🚫 Evita que console.error apareça no output dos testes
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+    delete process.env.JWT_SECRET; // reset
   });
 
   test('deve retornar 401 se não tiver token', async () => {
@@ -74,6 +83,18 @@ describe('auth middleware', () => {
     expect(res.json).toHaveBeenCalledWith({ erro: 'Token expirado' });
   });
 
+  test('deve retornar 401 se token sem id', async () => {
+    process.env.JWT_SECRET = 'secret';
+    req.headers.authorization = 'Bearer token';
+
+    (jwt.verify as jest.Mock).mockReturnValue({}); // sem id
+
+    await auth(req, res as Response, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ erro: 'Token inválido' });
+  });
+
   test('deve retornar 401 se usuário não existe', async () => {
     process.env.JWT_SECRET = 'secret';
     req.headers.authorization = 'Bearer token';
@@ -101,5 +122,19 @@ describe('auth middleware', () => {
 
     expect(next).toHaveBeenCalled();
     expect(req.user).toEqual({ id: '123', role: 'admin' });
+  });
+
+  test('deve retornar 500 em erro desconhecido', async () => {
+    process.env.JWT_SECRET = 'secret';
+    req.headers.authorization = 'Bearer token';
+
+    (jwt.verify as jest.Mock).mockImplementation(() => {
+      throw new Error('qualquer erro');
+    });
+
+    await auth(req, res as Response, next);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ erro: 'Erro ao validar token' });
   });
 });
