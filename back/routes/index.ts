@@ -3,6 +3,7 @@ import authRoutes from './auth.routes';
 import cadastroRoutes from './cadastro.routes';
 import adminRoutes from './admin.routes';
 import aulaRoutes from './aulas.routes';
+import arquivosRoutes from './arquivos.routes'
 
 
 const router = Router();
@@ -11,6 +12,8 @@ router.use('/auth', authRoutes);
 router.use('/cadastro', cadastroRoutes);
 router.use('/admin', adminRoutes);
 router.use('/aulas', aulaRoutes);
+router.use('/arquivos',arquivosRoutes);
+
 
 
 export default router;

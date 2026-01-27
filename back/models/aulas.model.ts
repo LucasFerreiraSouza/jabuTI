@@ -49,13 +49,13 @@ const AulaSchema = new Schema(
 
     /* Imagem ilustrativa da aula
        Normalmente será uma URL do Cloudinary */
-    imagem: {
-      type: String,
-      required: true
-    },
+      imagem: {
+        url: String
+      },
+
 
     /* ID do usuário que criou a aula
-       Relaciona com o professor */
+       Relaciona com o admin */
     criadoPor: {
       type: Schema.Types.ObjectId, // ID único do MongoDB
       ref: 'Usuario',              // Faz referência ao model Usuario

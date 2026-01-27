@@ -64,7 +64,7 @@ export const criarAula = async (req: Request, res: Response) => {
     } = req.body;
 
     // pega o usuário logado pelo token
-    const criadoPor = (req as any).userId;
+    const criadoPor = (req as any).user?.id;
 
     /* Validação mínima
        Evita salvar aula incompleta */

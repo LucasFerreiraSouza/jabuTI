@@ -7,6 +7,10 @@ interface IUsuario extends Document {
   role: 'ESTUDANTE' | 'ADMIN';
   status: 'PENDENTE' | 'APROVADO' | 'REPROVADO';
 
+  avatar?: {
+    url: string;
+  };
+
   doisFatoresAtivo: boolean;
 
   codigo2FA?: string;
@@ -55,7 +59,7 @@ const UsuarioSchema = new Schema<IUsuario>(
 
     role: {
       type: String,
-      enum: ['ESTUDANTE', 'ADMIN'],
+      enum: ['ESTUDANTE', 'PROFESSOR', 'ADMIN'],
       default: 'ESTUDANTE',
       index: true
     },
@@ -65,6 +69,11 @@ const UsuarioSchema = new Schema<IUsuario>(
       enum: ['PENDENTE', 'APROVADO', 'REPROVADO'],
       default: 'PENDENTE',
       index: true
+    },
+
+    avatar: {
+      url: { type: String },
+      public_id: { type: String }
     },
 
     doisFatoresAtivo: {
