@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import cloudinary from "../config/cloudinary";
 import Usuario from "../models/usuarios.model";
-import Aula from "../models/aulas.model";
+import {Aula} from "../models/aulas.model";
 import { AuthRequest } from "../types/AuthRequest";
 
 /* =========================
@@ -80,32 +80,32 @@ export const deleteAvatar = async (req: AuthRequest, res: Response) => {
 };
 
 /* =========================
-   UPLOAD IMAGEM AULA
+   UPLOAD IMAGEM EM CONTEÚDO DE AULA
    ========================= */
-export const uploadImagemAula = async (req: AuthRequest, res: Response) => {
+export const uploadImagemConteudo = async (req: AuthRequest, res: Response) => {
   try {
     const file = req.file;
-    const { aulaId } = req.body;
+    const { aulaId, conteudoId } = req.body;
 
     if (!file) return res.status(400).json({ erro: "Arquivo não enviado" });
     if (!aulaId) return res.status(400).json({ erro: "aulaId é obrigatório" });
+    if (!conteudoId) return res.status(400).json({ erro: "conteudoId é obrigatório" });
 
     const aula = await Aula.findById(aulaId);
     if (!aula) return res.status(404).json({ erro: "Aula não encontrada" });
+
+    const conteudo = aula.conteudos.id(conteudoId);
+    if (!conteudo) return res.status(404).json({ erro: "Conteúdo não encontrado" });
 
     const result = await cloudinary.uploader.upload(file.path, {
       folder: "aulas",
     });
 
-    // Atualiza a aula com a nova imagem
-    aula.imagem = {
-      url: result.secure_url,
-    };
+    // Atualiza a imagem do conteúdo
+    conteudo.imagem = { url: result.secure_url };
     await aula.save();
 
-    return res.status(201).json({
-      url: result.secure_url,
-    });
+    return res.status(201).json({ url: result.secure_url });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ erro: "Erro ao enviar arquivo" });
@@ -113,28 +113,30 @@ export const uploadImagemAula = async (req: AuthRequest, res: Response) => {
 };
 
 /* =========================
-   DELETE IMAGEM AULA (APENAS URL)
+   DELETE IMAGEM EM CONTEÚDO DE AULA
    ========================= */
-export const deleteImagemAula = async (req: AuthRequest, res: Response) => {
+export const deleteImagemConteudo = async (req: AuthRequest, res: Response) => {
   try {
-    const { url, aulaId } = req.body;
+    const { url, aulaId, conteudoId } = req.body;
 
     if (!url) return res.status(400).json({ erro: "url é obrigatória" });
     if (!aulaId) return res.status(400).json({ erro: "aulaId é obrigatório" });
+    if (!conteudoId) return res.status(400).json({ erro: "conteudoId é obrigatório" });
 
     const aula = await Aula.findById(aulaId);
     if (!aula) return res.status(404).json({ erro: "Aula não encontrada" });
 
-    const public_id = extractPublicIdFromUrl(url);
+    const conteudo = aula.conteudos.id(conteudoId);
+    if (!conteudo) return res.status(404).json({ erro: "Conteúdo não encontrado" });
 
-    // Deleta do Cloudinary
+    const public_id = extractPublicIdFromUrl(url);
     await cloudinary.uploader.destroy(public_id);
 
-    // Remove a imagem do documento da aula
-    aula.imagem = { url: "" };
+    // Remove a imagem do conteúdo
+    conteudo.imagem = { url: "" };
     await aula.save();
 
-    return res.status(200).json({ message: "Imagem de aula deletada com sucesso" });
+    return res.status(200).json({ message: "Imagem de conteúdo deletada com sucesso" });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ erro: "Erro ao deletar arquivo" });

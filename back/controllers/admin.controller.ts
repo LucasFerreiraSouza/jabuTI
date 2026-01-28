@@ -1,10 +1,12 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
+import cloudinary from "../config/cloudinary";
+
 
 
 import Usuario from '../models/usuarios.model';
-import Aula from '../models/aulas.model';
+import {Aula} from '../models/aulas.model';
 
 import { emailService } from '../utils/emailService';
 import { validarSenhaForte } from '../utils/senha';
@@ -112,18 +114,39 @@ export const deletarUsuario = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const usuario = await Usuario.findByIdAndDelete(id);
-
+    const usuario = await Usuario.findById(id);
     if (!usuario) {
       return res.status(404).json({ erro: 'Usuário não encontrado' });
     }
 
+    // Deleta avatar do Cloudinary, se existir
+    if (usuario.avatar?.url) {
+      try {
+        const url = usuario.avatar.url;
+        const extractPublicIdFromUrl = (url: string) => {
+          const cleanUrl = url.split("?")[0];
+          const afterUpload = cleanUrl.split("/upload/")[1];
+          const withoutVersion = afterUpload.replace(/^v\d+\//, "");
+          return withoutVersion.split(".")[0];
+        };
+        const public_id = extractPublicIdFromUrl(url);
+        await cloudinary.uploader.destroy(public_id);
+      } catch (err) {
+        console.error("Erro ao deletar avatar no Cloudinary:", err);
+      }
+    }
+
+    // Deleta o usuário
+    await Usuario.findByIdAndDelete(id);
+
+    // Deleta todas as aulas criadas pelo usuário
     await Aula.deleteMany({ criadoPor: id });
 
     return res.status(200).json({
-      mensagem: 'Usuário removido com sucesso'
+      mensagem: 'Usuário e avatar removidos com sucesso'
     });
-  } catch {
+  } catch (err) {
+    console.error(err);
     return res.status(500).json({ erro: 'Erro ao deletar usuário' });
   }
 };

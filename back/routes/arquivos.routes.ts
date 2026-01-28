@@ -2,8 +2,8 @@ import { Router } from "express";
 import {
   uploadAvatar,
   deleteAvatar,
-  uploadImagemAula,
-  deleteImagemAula
+  uploadImagemConteudo ,
+  deleteImagemConteudo 
 } from "../controllers/arquivos.controller";
 import { upload } from "../middlewares/arquivos.middleware";
 import { auth } from "../middlewares/auth";
@@ -25,14 +25,14 @@ router.post(
   auth,
   adminOnly,
   upload.single("file"),
-  uploadImagemAula
+  uploadImagemConteudo 
 );
 
 router.delete(
   "/aula/delete",
   auth,
   adminOnly,
-  deleteImagemAula
+  deleteImagemConteudo 
 );
 
 export default router;

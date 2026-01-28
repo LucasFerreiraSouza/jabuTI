@@ -1,83 +1,93 @@
-/* Importa Schema e model do Mongoose
-   Schema define a estrutura do documento
-   model cria a collection no MongoDB */
-import { Schema, model } from 'mongoose';
+import { Schema, model, Document, Types } from 'mongoose';
 
-/* Cria o schema de Aula
-   Define como uma aula será armazenada no banco */
-const AulaSchema = new Schema(
+/* =============================
+   Subdocumento de Resposta de Exercício
+============================= */
+const RespostaSchema = new Schema(
   {
-    /* Título da aula */
-    titulo: {
-      type: String,
-      required: true
-    },
-
-    /* Pequena descrição da aula
-       Usada em listagens e cards */
-    descricao: {
-      type: String,
-      required: true
-    },
-
-    /* Texto explicativo da aula
-       Pode conter markdown ou HTML */
-    texto: {
-      type: String,
-      required: true
-    },
-
-    /* URL do vídeo da aula
-       Ex: YouTube, Vimeo ou vídeo hospedado */
-    video: {
-      type: String,
-      required: true
-    },
-
-    /* Código de exemplo da aula
-       Pode ser uma string grande */
-    codigo: {
-      type: String,
-      required: true
-    },
-
-    /* Exercício proposto ao aluno */
-    exercicio: {
-      type: String,
-      required: true
-    },
-
-    /* Imagem ilustrativa da aula
-       Normalmente será uma URL do Cloudinary */
-      imagem: {
-        url: String
-      },
-
-
-    /* ID do usuário que criou a aula
-       Relaciona com o admin */
-    criadoPor: {
-      type: Schema.Types.ObjectId, // ID único do MongoDB
-      ref: 'Usuario',              // Faz referência ao model Usuario
-      required: true
-    },
-
-    /* Define se a aula está visível ou não */
-    publicada: {
-      type: Boolean,
-      default: false
-    }
+    usuario: { type: Schema.Types.ObjectId, ref: 'Usuario', required: true },
+    correta: { type: Boolean, required: true },
+    dataResposta: { type: Date, default: Date.now },
+    tempoSegundos: { type: Number, default: 0 } // tempo que o aluno levou para responder
   },
-  {
-    /* Adiciona automaticamente:
-       createdAt e updatedAt */
-    timestamps: true
-  }
+  { _id: true }
 );
 
-/* Cria o model Aula
-   Isso vira a collection "aulas" no MongoDB */
-const Aula = model('Aula', AulaSchema);
+/* =============================
+   Subdocumento de Pergunta de Exercício
+============================= */
+const ExercicioSchema = new Schema(
+  {
+    pergunta: { type: String, required: true },
+    alternativas: [{ type: String, required: true }],
+    respostaCorreta: { type: Number, required: true }, // índice da alternativa correta
+    acertos: { type: Number, default: 0 }, // total de acertos de todos os usuários
+    erros: { type: Number, default: 0 },   // total de erros de todos os usuários
+    tempoLimiteSegundos: { type: Number, default: 0 }, // 0 = sem limite
+    respostas: [RespostaSchema] // array de respostas individuais
+  },
+  { _id: true }
+);
 
-/* Exporta o model para uso nos controllers */
-export default Aula;
+/* =============================
+   Subdocumento de Conteúdo
+============================= */
+const ConteudoSchema = new Schema(
+  {
+    tipo: {
+      type: String,
+      enum: ["texto", "video", "codigo", "imagem", "exercicio"],
+      required: true,
+      default: "texto",
+    },
+    titulo: { type: String, maxlength: 2000 },
+    descricao: { type: String, maxlength: 2000 },
+    texto: { type: String },
+    codigo: { type: String },
+    video: { type: String },
+    imagem: { url: { type: String } },
+    exercicio: [ExercicioSchema], // se tipo === "exercicio"
+    ordem: { type: Number, default: 0 },
+    backgroundColor: { type: String, default: "#ffffff" },
+    textColor: { type: String, default: "#000000" },
+    criadoPor: { type: Schema.Types.ObjectId, ref: "Usuario" },
+    criadoPorUsername: { type: String, maxlength: 50 },
+  },
+  { timestamps: true }
+);
+
+/* =============================
+   Schema principal da Aula
+============================= */
+const AulaSchema = new Schema(
+  {
+    titulo: { type: String, required: true },
+    descricao: { type: String, required: true },
+    publicada: { type: Boolean, default: false },
+    ordem: { type: Number, default: 0 },
+    backgroundColor: { type: String, default: "#ffffff" },
+    textColor: { type: String, default: "#000000" },
+    conteudos: [ConteudoSchema],
+    criadoPor: { type: Schema.Types.ObjectId, ref: "Usuario", required: true },
+  },
+  { timestamps: true }
+);
+
+/* =============================
+   Schema de Configuração do Site
+============================= */
+const SiteConfigSchema = new Schema(
+  {
+    backgroundColorSite: { type: String, default: "#f0f0f0" },
+    textColorSite: { type: String, default: "#000000" },
+  },
+  { collection: "site_config", timestamps: true }
+);
+
+/* =============================
+   Models
+============================= */
+const Aula = model("Aula", AulaSchema);
+const SiteConfig = model("SiteConfig", SiteConfigSchema);
+
+export { Aula, SiteConfig };
