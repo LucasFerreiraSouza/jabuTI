@@ -6,6 +6,7 @@ import {
   atualizarUsuario,
   deletarUsuario,
   aprovarUsuario,
+  aprovacaoAutomatica,
   reprovarUsuario,
   promoverAdmin,
   despromoverAdmin
@@ -25,6 +26,7 @@ router.put('/:id', auth, adminOnly, atualizarUsuario);
 router.delete('/:id', auth, adminOnly, deletarUsuario);
 
 router.patch('/:id/aprovar', auth, adminOnly, emailLimiter, aprovarUsuario);
+router.patch('/config/aprovacao-automatica',auth,adminOnly,aprovacaoAutomatica);
 router.patch('/:id/reprovar', auth, adminOnly, emailLimiter, reprovarUsuario);
 
 router.patch('/:id/promover-admin', auth, adminOnly, promoverAdmin);

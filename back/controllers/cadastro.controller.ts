@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 
+
+import SistemaConfig from '../models/sistema.model';
 import Usuario from '../models/usuarios.model';
 import { emailService } from '../utils/emailService';
 import { validarSenhaForte } from '../utils/senha';
@@ -32,6 +34,41 @@ export const registrarUsuario = async (req: Request, res: Response) => {
       return res.status(409).json({ erro: 'Email já cadastrado' });
     }
 
+    const config = await SistemaConfig.findOne();
+
+    // 👉 se aprovação automática estiver ligada
+    if (config?.aprovacaoAutomaticaUsuarios) {
+
+      const token = crypto.randomBytes(32).toString('hex');
+
+      await Usuario.create({
+        nome,
+        email,
+        role: 'ESTUDANTE',
+        status: 'APROVADO',
+        senha: null,
+        doisFatoresAtivo: false,
+        tokenAtivacaoSenha: token,
+        tokenAtivacaoExpira: new Date(
+          Date.now() + 24 * 60 * 60 * 1000
+        )
+      });
+
+      const linkAtivacao =
+        `${process.env.FRONTEND_URL}/ativar-senha?token=${token}`;
+
+      await emailService.enviarAtivacaoSenha(
+        email,
+        nome,
+        linkAtivacao
+      );
+
+      return res.status(201).json({
+        mensagem: 'Cadastro realizado. Enviamos um e-mail para ativação da sua senha.'
+      });
+    }
+
+    // 👉 se NÃO estiver ligada
     await Usuario.create({
       nome,
       email,
@@ -46,10 +83,13 @@ export const registrarUsuario = async (req: Request, res: Response) => {
     return res.status(201).json({
       mensagem: 'Cadastro realizado. Aguarde aprovação do administrador.'
     });
-  } catch {
+
+  } catch (err) {
+    console.error(err);
     return res.status(500).json({ erro: 'Erro ao registrar usuário' });
   }
 };
+
 
 export const solicitarResetSenha = async (req: Request, res: Response) => {
   try {
