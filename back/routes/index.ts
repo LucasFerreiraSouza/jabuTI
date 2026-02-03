@@ -9,6 +9,8 @@ import arquivosRoutes from './arquivos.routes';
 import conteudosRoutes from './conteudos.routes';
 import exerciciosRoutes from './exercicios.routes';
 import personalizaveisRoutes from './personalizaveis.routes';
+import analiticosRoutes from './analiticos.routes';
+
 
 const router = Router();
 
@@ -21,5 +23,7 @@ router.use('/arquivos', arquivosRoutes);
 router.use('/conteudos', conteudosRoutes);
 router.use('/exercicios', exerciciosRoutes);
 router.use('/personalizaveis', personalizaveisRoutes);
+router.use('/analiticos', analiticosRoutes);
+
 
 export default router;

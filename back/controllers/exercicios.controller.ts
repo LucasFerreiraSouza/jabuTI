@@ -107,16 +107,23 @@ export const responderExercicio = async (req: Request, res: Response) => {
     const aulaId = Array.isArray(req.params.aulaId) ? req.params.aulaId[0] : req.params.aulaId!;
     const conteudoId = Array.isArray(req.params.conteudoId) ? req.params.conteudoId[0] : req.params.conteudoId!;
     const exercicioId = Array.isArray(req.params.exercicioId) ? req.params.exercicioId[0] : req.params.exercicioId!;
-    const usuarioId = req.body.usuarioId;
-    const { respostaEscolhida, tempoSegundos } = req.body;
 
-    if (!usuarioId) return res.status(400).json({ erro: "Usuário não fornecido" });
+    const { usuarioId, respostaEscolhida, tempoSegundos } = req.body;
 
-    if (!mongoose.Types.ObjectId.isValid(aulaId) ||
-        !mongoose.Types.ObjectId.isValid(conteudoId) ||
-        !mongoose.Types.ObjectId.isValid(exercicioId) ||
-        !mongoose.Types.ObjectId.isValid(usuarioId)) {
+    if (!usuarioId)
+      return res.status(400).json({ erro: "Usuário não fornecido" });
+
+    if (
+      !mongoose.Types.ObjectId.isValid(aulaId) ||
+      !mongoose.Types.ObjectId.isValid(conteudoId) ||
+      !mongoose.Types.ObjectId.isValid(exercicioId) ||
+      !mongoose.Types.ObjectId.isValid(usuarioId)
+    ) {
       return res.status(400).json({ erro: "ID inválido" });
+    }
+
+    if (typeof respostaEscolhida !== "number") {
+      return res.status(400).json({ erro: "Resposta inválida" });
     }
 
     const aula = await Aula.findById(aulaId);
@@ -124,33 +131,48 @@ export const responderExercicio = async (req: Request, res: Response) => {
 
     const conteudo = aula.conteudos.id(conteudoId) as any;
     if (!conteudo) return res.status(404).json({ erro: "Conteúdo não encontrado" });
-    if (conteudo.tipo !== "exercicio") return res.status(400).json({ erro: "Conteúdo não é do tipo exercício" });
+    if (conteudo.tipo !== "exercicio")
+      return res.status(400).json({ erro: "Conteúdo não é do tipo exercício" });
 
     const exercicio = conteudo.exercicio.id(exercicioId) as any;
     if (!exercicio) return res.status(404).json({ erro: "Exercício não encontrado" });
 
     const correta = respostaEscolhida === exercicio.respostaCorreta;
 
-    // Sempre adiciona uma nova resposta ao histórico
+    /**
+     * 🔴 NÃO apaga histórico
+     * 🔴 NÃO sobrescreve
+     * 🔴 sempre registra a tentativa
+     */
     exercicio.respostas.push({
-      usuario: usuarioId,
+      usuario: new mongoose.Types.ObjectId(usuarioId),
       correta,
-      tempoSegundos: tempoSegundos || 0,
+      tempoSegundos: typeof tempoSegundos === "number" ? tempoSegundos : 0
+      // dataResposta vem automático pelo schema
     });
 
-    // Recalcula totais de acertos e erros
-    exercicio.acertos = exercicio.respostas.filter((r: any) => r.correta).length;
-    exercicio.erros = exercicio.respostas.filter((r: any) => !r.correta).length;
+    /**
+     * Reconta estatísticas globais
+     */
+    exercicio.acertos = exercicio.respostas.reduce(
+      (total: number, r: any) => r.correta ? total + 1 : total,
+      0
+    );
+
+    exercicio.erros = exercicio.respostas.length - exercicio.acertos;
 
     await aula.save();
 
     return res.status(200).json({
-      resultado: correta ? "acertou" : "errou",
+      correta,
+      dataResposta: new Date(),
       acertos: exercicio.acertos,
-      erros: exercicio.erros,
+      erros: exercicio.erros
     });
+
   } catch (err) {
     console.error(err);
     return res.status(500).json({ erro: "Erro ao responder exercício" });
   }
 };
+

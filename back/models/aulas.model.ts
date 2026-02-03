@@ -6,12 +6,23 @@ import { Schema, model, Document, Types } from 'mongoose';
 const RespostaSchema = new Schema(
   {
     usuario: { type: Schema.Types.ObjectId, ref: 'Usuario', required: true },
+
+    // índice da alternativa escolhida
+    respostaEscolhida: { type: Number, required: true },
+
     correta: { type: Boolean, required: true },
+
     dataResposta: { type: Date, default: Date.now },
-    tempoSegundos: { type: Number, default: 0 } // tempo que o aluno levou para responder
+
+    // tempo que o aluno levou para responder
+    tempoSegundos: { type: Number, default: 0 },
+
+    // se respondeu dentro do tempo limite da pergunta
+    dentroDoTempo: { type: Boolean, default: true }
   },
   { _id: true }
 );
+
 
 /* =============================
    Subdocumento de Pergunta de Exercício
