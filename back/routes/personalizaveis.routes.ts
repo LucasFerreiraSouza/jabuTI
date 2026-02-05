@@ -26,8 +26,8 @@ router.patch('/aula/:aulaId/conteudo/:conteudoId/text', auth, adminOnly, alterar
 router.patch('/aula/:aulaId/conteudo/:conteudoId/ordem', auth, adminOnly, alterarOrdemConteudo);
 
 // Alterações globais do site
-router.patch('/site/cores', auth, adminOnly, alterarBackgroundSite);
-router.patch('/site/textColor', auth, adminOnly, alterarTextColorSite);
+router.patch('/site/background', auth, adminOnly, alterarBackgroundSite);
+router.patch('/site/text', auth, adminOnly, alterarTextColorSite);
 
 
 export default router;

@@ -124,7 +124,10 @@ export const deletarConteudo = async (req: Request, res: Response) => {
     const aulaId = Array.isArray(req.params.aulaId) ? req.params.aulaId[0] : req.params.aulaId;
     const conteudoId = Array.isArray(req.params.conteudoId) ? req.params.conteudoId[0] : req.params.conteudoId;
 
-    if (!mongoose.Types.ObjectId.isValid(aulaId) || !mongoose.Types.ObjectId.isValid(conteudoId))
+    if (
+      !mongoose.Types.ObjectId.isValid(aulaId) ||
+      !mongoose.Types.ObjectId.isValid(conteudoId)
+    )
       return res.status(400).json({ erro: "ID inválido" });
 
     const aula = await Aula.findById(aulaId);
@@ -133,10 +136,12 @@ export const deletarConteudo = async (req: Request, res: Response) => {
     const conteudo = aula.conteudos.id(conteudoId);
     if (!conteudo) return res.status(404).json({ erro: "Conteúdo não encontrado" });
 
-    (aula.conteudos.id(conteudoId) as any)?.remove();
+    aula.conteudos.pull({ _id: conteudoId });
+
     await aula.save();
 
     return res.status(200).json({ mensagem: "Conteúdo removido com sucesso" });
+
   } catch (err) {
     console.error(err);
     return res.status(500).json({ erro: "Erro ao deletar conteúdo" });

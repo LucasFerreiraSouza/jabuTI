@@ -13,8 +13,8 @@ import { adminOnly } from '../middlewares/adminOnly';
 const router = Router();
 
 // Rotas públicas ou apenas autenticadas
-router.get('/', auth, listarAulas); // listar todas as aulas
-router.get('/:id', auth, buscarAulaPorId); // buscar aula específica
+router.get('/', listarAulas); // listar todas as aulas
+router.get('/:id', buscarAulaPorId); // buscar aula específica
 
 // Rotas que apenas administradores podem acessar
 router.post('/', auth, adminOnly, criarAula);

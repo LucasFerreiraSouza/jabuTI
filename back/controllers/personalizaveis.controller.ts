@@ -182,61 +182,81 @@ export const alterarOrdemConteudo = async (req: Request, res: Response) => {
 };
 
 /* ============================
-   ALTERAR CORES GLOBAIS DO SITE
+   ALTERAR BACKGROUND GLOBAL DO SITE
 ============================ */
 export const alterarBackgroundSite = async (req: Request, res: Response) => {
   try {
-    const { backgroundColor, textColor } = req.body;
+    const { cor } = req.body;
 
-    if (!backgroundColor && !textColor) 
-      return res.status(400).json({ erro: "Nenhuma cor fornecida" });
+    if (!cor)
+      return res.status(400).json({ erro: "cor não fornecida" });
 
-    const config = await SiteConfig.findOne();
+    let config = await SiteConfig.findOne();
+
     if (!config) {
-      // cria se não existir
-      const novoConfig = new SiteConfig({ 
-        backgroundColorSite: backgroundColor || "#f0f0f0",
-        textColorSite: textColor || "#000000",
+      config = new SiteConfig({
+        backgroundColorSite: cor,
+        textColorSite: "#000000"
       });
-      await novoConfig.save();
-      return res.status(200).json({ mensagem: "Cores do site alteradas", config: novoConfig });
+
+      await config.save();
+
+      return res.status(200).json({
+        mensagem: "Background global do site alterado",
+        config
+      });
     }
 
-    if (backgroundColor) config.backgroundColorSite = backgroundColor;
-    if (textColor) config.textColorSite = textColor;
+    config.backgroundColorSite = cor;
     await config.save();
 
-    return res.status(200).json({ mensagem: "Cores do site alteradas", config });
+    return res.status(200).json({
+      mensagem: "Background global do site alterado",
+      config
+    });
+
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ erro: "Erro ao alterar cores do site" });
+    return res.status(500).json({ erro: "Erro ao alterar background global do site" });
   }
 };
+
+
 
 /* ============================
    ALTERAR TEXT COLOR GLOBAL DO SITE
 ============================ */
 export const alterarTextColorSite = async (req: Request, res: Response) => {
   try {
-    const { textColor } = req.body;
+    const { cor } = req.body;
 
-    if (!textColor) 
-      return res.status(400).json({ erro: "textColor não fornecido" });
+    if (!cor)
+      return res.status(400).json({ erro: "cor não fornecida" });
 
-    const config = await SiteConfig.findOne();
+    let config = await SiteConfig.findOne();
+
     if (!config) {
-      // cria se não existir
-      const novoConfig = new SiteConfig({ 
-        textColorSite: textColor,
+      config = new SiteConfig({
+        backgroundColorSite: "#f0f0f0",
+        textColorSite: cor
       });
-      await novoConfig.save();
-      return res.status(200).json({ mensagem: "Text color global do site alterado", config: novoConfig });
+
+      await config.save();
+
+      return res.status(200).json({
+        mensagem: "Text color global do site alterado",
+        config
+      });
     }
 
-    config.textColorSite = textColor;
+    config.textColorSite = cor;
     await config.save();
 
-    return res.status(200).json({ mensagem: "Text color global do site alterado", config });
+    return res.status(200).json({
+      mensagem: "Text color global do site alterado",
+      config
+    });
+
   } catch (err) {
     console.error(err);
     return res.status(500).json({ erro: "Erro ao alterar text color global do site" });

@@ -51,8 +51,9 @@ export const dashboardExercicio = async (req: Request, res: Response) => {
         : new Date(0);
 
       const dataFim = fim
-        ? new Date(fim as string)
+        ? new Date(fim as string + "T23:59:59.999Z")
         : new Date();
+
 
       respostas = respostas.filter((r: any) => {
         const d = new Date(r.dataResposta);
@@ -124,6 +125,13 @@ export const rankingExercicio = async (req: Request, res: Response) => {
 
     const { inicio, fim, usuarioId } = req.query;
 
+    const rawUsuarioId =
+      typeof usuarioId === "string"
+        ? usuarioId
+        : Array.isArray(usuarioId) && typeof usuarioId[0] === "string"
+          ? usuarioId[0]
+          : undefined;
+
     if (
       !mongoose.Types.ObjectId.isValid(aulaId) ||
       !mongoose.Types.ObjectId.isValid(conteudoId) ||
@@ -132,22 +140,30 @@ export const rankingExercicio = async (req: Request, res: Response) => {
       return res.status(400).json({ erro: "ID inválido" });
     }
 
-    if (usuarioId && !mongoose.Types.ObjectId.isValid(usuarioId as string)) {
+    if (rawUsuarioId && !mongoose.Types.ObjectId.isValid(rawUsuarioId)) {
       return res.status(400).json({ erro: "Usuário inválido" });
     }
 
     const aula = await Aula.findById(aulaId);
     if (!aula) return res.status(404).json({ erro: "Aula não encontrada" });
 
-    const conteudo = aula.conteudos.id(conteudoId) as any;
-    if (!conteudo || conteudo.tipo !== "exercicio")
-      return res.status(404).json({ erro: "Conteúdo inválido" });
+    const conteudo: any = aula.conteudos.id(conteudoId);
+    if (!conteudo) {
+      return res.status(404).json({ erro: "Conteúdo não encontrado" });
+    }
 
-    const exercicio = conteudo.exercicio.id(exercicioId) as any;
-    if (!exercicio)
+    if (!Array.isArray(conteudo.exercicio)) {
+      return res.status(404).json({ erro: "Conteúdo não possui exercícios" });
+    }
+
+    const exercicio: any = conteudo.exercicio.id(exercicioId);
+    if (!exercicio) {
       return res.status(404).json({ erro: "Exercício não encontrado" });
+    }
 
-    let respostas = exercicio.respostas || [];
+    let respostas = Array.isArray(exercicio.respostas)
+      ? exercicio.respostas
+      : [];
 
     if (inicio || fim) {
       const dataInicio = inicio
@@ -155,10 +171,11 @@ export const rankingExercicio = async (req: Request, res: Response) => {
         : new Date(0);
 
       const dataFim = fim
-        ? new Date(fim as string)
+        ? new Date(fim as string + "T23:59:59.999Z")
         : new Date();
 
       respostas = respostas.filter((r: any) => {
+        if (!r?.dataResposta) return false;
         const d = new Date(r.dataResposta);
         return d >= dataInicio && d <= dataFim;
       });
@@ -168,7 +185,8 @@ export const rankingExercicio = async (req: Request, res: Response) => {
 
     for (const r of respostas) {
 
-      const userId = r.usuario.toString();
+      const userId = r.usuario?.toString();
+      if (!userId) continue;
 
       if (!mapa[userId]) {
         mapa[userId] = {
@@ -181,7 +199,7 @@ export const rankingExercicio = async (req: Request, res: Response) => {
 
       mapa[userId].tentativas++;
 
-      if (r.correta) {
+      if (r.correta === true) {
         mapa[userId].acertos++;
       }
 
@@ -218,10 +236,9 @@ export const rankingExercicio = async (req: Request, res: Response) => {
       return a.tempoMedioSegundos - b.tempoMedioSegundos;
     });
 
-    // ✅ se quiser apenas um aluno no retorno
-    if (usuarioId) {
+    if (rawUsuarioId) {
       ranking = ranking.filter(
-        (r: any) => r.usuario === usuarioId
+        (r: any) => r.usuario === rawUsuarioId
       );
     }
 

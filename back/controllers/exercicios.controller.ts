@@ -146,10 +146,11 @@ export const responderExercicio = async (req: Request, res: Response) => {
      */
     exercicio.respostas.push({
       usuario: new mongoose.Types.ObjectId(usuarioId),
+      respostaEscolhida, // 👈 faltava isso
       correta,
       tempoSegundos: typeof tempoSegundos === "number" ? tempoSegundos : 0
-      // dataResposta vem automático pelo schema
     });
+
 
     /**
      * Reconta estatísticas globais
