@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 
-import Aula from '../../models/aulas.model';
+import {Aula} from '../../models/aulas.model';
 
 import {
   listarAulas,

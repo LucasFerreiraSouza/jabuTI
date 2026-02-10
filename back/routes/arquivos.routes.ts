@@ -5,7 +5,7 @@ import {
   uploadImagemConteudo ,
   deleteImagemConteudo 
 } from "../controllers/arquivos.controller";
-import { upload } from "../middlewares/arquivos.middleware";
+import { upload } from "../middlewares/arquivos";
 import { auth } from "../middlewares/auth";
 import { adminOnly } from "../middlewares/adminOnly";
 
