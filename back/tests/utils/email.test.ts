@@ -1,161 +1,43 @@
-import { emailService } from "../../utils/emailService";
-import { transporter } from "../../utils/email";
-import { emailTemplates } from "../../utils/emailTemplates";
+import nodemailer from 'nodemailer';
+import { transporter } from '../../utils/email'; // ajuste o path conforme seu projeto
 
-jest.mock("../../utils/email");
-jest.mock("../../utils/emailTemplates");
+jest.mock('nodemailer');
 
-describe("emailService", () => {
+const mockedNodemailer = nodemailer as jest.Mocked<typeof nodemailer>;
+
+describe('Nodemailer transporter', () => {
+  const OLD_ENV = process.env;
+
   beforeEach(() => {
-    (transporter.sendMail as jest.Mock).mockClear();
+    jest.resetAllMocks();
+    process.env = { ...OLD_ENV };
   });
 
-  it("deve enviar email de cadastro recebido", async () => {
-    (emailTemplates.cadastroRecebido as jest.Mock).mockReturnValue({
-      subject: "teste",
-      html: "<p>teste</p>",
-    });
-
-    await emailService.cadastroRecebido("email@test.com", "Lucas");
-
-    expect(transporter.sendMail).toHaveBeenCalledWith({
-      from: process.env.EMAIL_FROM,
-      to: "email@test.com",
-      subject: "teste",
-      html: "<p>teste</p>",
-    });
+  afterAll(() => {
+    process.env = OLD_ENV;
   });
 
-  it("deve enviar email com código 2FA", async () => {
-    (emailTemplates.codigo2FA as jest.Mock).mockReturnValue({
-      subject: "teste 2FA",
-      html: "<p>codigo</p>",
-    });
+  it('deve criar o transporter com as configurações corretas', () => {
+    process.env.SMTP_HOST = 'smtp.example.com';
+    process.env.SMTP_PORT = '587';
+    process.env.SMTP_USER = 'user@example.com';
+    process.env.SMTP_PASS = 'password';
 
-    await emailService.codigo2FA("email@test.com", "Lucas", "123456");
+    // mock do createTransport
+    const mockCreateTransport = jest.fn();
+    mockedNodemailer.createTransport.mockImplementation(mockCreateTransport);
 
-    expect(transporter.sendMail).toHaveBeenCalledWith({
-      from: process.env.EMAIL_FROM,
-      to: "email@test.com",
-      subject: "teste 2FA",
-      html: "<p>codigo</p>",
-    });
-  });
+    // importa novamente para pegar o transporter com o mock
+    require('../../utils/email');
 
-  it("deve enviar email de aprovado", async () => {
-    (emailTemplates.aprovado as jest.Mock).mockReturnValue({
-      subject: "aprovado",
-      html: "<p>aprovado</p>",
-    });
-
-    await emailService.aprovado("email@test.com", "Lucas");
-
-    expect(transporter.sendMail).toHaveBeenCalledWith({
-      from: process.env.EMAIL_FROM,
-      to: "email@test.com",
-      subject: "aprovado",
-      html: "<p>aprovado</p>",
-    });
-  });
-
-  it("deve enviar email de ativação de senha", async () => {
-    (emailTemplates.ativacaoSenha as jest.Mock).mockReturnValue({
-      subject: "ativacao",
-      html: "<p>ativar</p>",
-    });
-
-    await emailService.enviarAtivacaoSenha("email@test.com", "Lucas", "link");
-
-    expect(transporter.sendMail).toHaveBeenCalledWith({
-      from: process.env.EMAIL_FROM,
-      to: "email@test.com",
-      subject: "ativacao",
-      html: "<p>ativar</p>",
-    });
-  });
-
-  it("deve enviar email de reset de senha", async () => {
-    (emailTemplates.resetSenha as jest.Mock).mockReturnValue({
-      subject: "reset",
-      html: "<p>reset</p>",
-    });
-
-    await emailService.resetSenha("email@test.com", "Lucas", "link");
-
-    expect(transporter.sendMail).toHaveBeenCalledWith({
-      from: process.env.EMAIL_FROM,
-      to: "email@test.com",
-      subject: "reset",
-      html: "<p>reset</p>",
-    });
-  });
-
-  it("deve enviar email de reset de email", async () => {
-    (emailTemplates.resetEmail as jest.Mock).mockReturnValue({
-      subject: "reset email",
-      html: "<p>novo email</p>",
-    });
-
-    await emailService.resetEmail(
-      "email@test.com",
-      "Lucas",
-      "link",
-      "novo@email.com"
-    );
-
-    expect(transporter.sendMail).toHaveBeenCalledWith({
-      from: process.env.EMAIL_FROM,
-      to: "email@test.com",
-      subject: "reset email",
-      html: "<p>novo email</p>",
-    });
-  });
-
-  it("deve enviar email de reprovado", async () => {
-    (emailTemplates.reprovado as jest.Mock).mockReturnValue({
-      subject: "reprovado",
-      html: "<p>reprovado</p>",
-    });
-
-    await emailService.reprovado("email@test.com", "Lucas");
-
-    expect(transporter.sendMail).toHaveBeenCalledWith({
-      from: process.env.EMAIL_FROM,
-      to: "email@test.com",
-      subject: "reprovado",
-      html: "<p>reprovado</p>",
-    });
-  });
-
-  it("deve enviar email de promovido admin", async () => {
-    (emailTemplates.promovidoAdmin as jest.Mock).mockReturnValue({
-      subject: "promovido",
-      html: "<p>promovido</p>",
-    });
-
-    await emailService.promovidoAdmin("email@test.com", "Lucas");
-
-    expect(transporter.sendMail).toHaveBeenCalledWith({
-      from: process.env.EMAIL_FROM,
-      to: "email@test.com",
-      subject: "promovido",
-      html: "<p>promovido</p>",
-    });
-  });
-
-  it("deve enviar email de despromovido admin", async () => {
-    (emailTemplates.despromovidoAdmin as jest.Mock).mockReturnValue({
-      subject: "despromovido",
-      html: "<p>despromovido</p>",
-    });
-
-    await emailService.despromovidoAdmin("email@test.com", "Lucas");
-
-    expect(transporter.sendMail).toHaveBeenCalledWith({
-      from: process.env.EMAIL_FROM,
-      to: "email@test.com",
-      subject: "despromovido",
-      html: "<p>despromovido</p>",
+    expect(mockedNodemailer.createTransport).toHaveBeenCalledWith({
+      host: 'smtp.example.com',
+      port: 587,
+      secure: false,
+      auth: {
+        user: 'user@example.com',
+        pass: 'password',
+      },
     });
   });
 });

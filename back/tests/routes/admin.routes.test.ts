@@ -1,36 +1,62 @@
 import request from 'supertest';
-import express from 'express';
+import express, { Request, Response } from 'express';
 
 import adminRoutes from '../../routes/admin.routes';
 
 jest.mock('../../controllers/admin.controller', () => ({
-  listarUsuarios: jest.fn((req, res) => res.status(200).json({ ok: true })),
-  buscarUsuarioPorId: jest.fn((req, res) => res.status(200).json({ ok: true })),
-  criarUsuario: jest.fn((req, res) => res.status(201).json({ ok: true })),
-  atualizarUsuario: jest.fn((req, res) => res.status(200).json({ ok: true })),
-  deletarUsuario: jest.fn((req, res) => res.status(200).json({ ok: true })),
-  aprovarUsuario: jest.fn((req, res) => res.status(200).json({ ok: true })),
-  reprovarUsuario: jest.fn((req, res) => res.status(200).json({ ok: true })),
-  promoverAdmin: jest.fn((req, res) => res.status(200).json({ ok: true })),
-  despromoverAdmin: jest.fn((req, res) => res.status(200).json({ ok: true }))
+  listarUsuarios: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({ ok: true })
+  ),
+  buscarUsuarioPorId: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({ ok: true })
+  ),
+  criarUsuario: jest.fn((req: Request, res: Response) =>
+    res.status(201).json({ ok: true })
+  ),
+  atualizarUsuario: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({ ok: true })
+  ),
+  deletarUsuario: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({ ok: true })
+  ),
+  aprovarUsuario: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({ ok: true })
+  ),
+  reprovarUsuario: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({ ok: true })
+  ),
+  promoverAdmin: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({ ok: true })
+  ),
+  despromoverAdmin: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({ ok: true })
+  ),
+
+  // 🔴 FALTAVA ESSE
+  aprovacaoAutomatica: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({ ok: true })
+  )
 }));
 
 jest.mock('../../middlewares/auth', () => ({
-  auth: (_req: any, _res: any, next: any) => next()
+  auth: (_req: Request, _res: Response, next: any) => next()
 }));
 
 jest.mock('../../middlewares/adminOnly', () => ({
-  adminOnly: (_req: any, _res: any, next: any) => next()
+  adminOnly: (_req: Request, _res: Response, next: any) => next()
 }));
 
 jest.mock('../../middlewares/rateLimit', () => ({
-  emailLimiter: (_req: any, _res: any, next: any) => next()
+  emailLimiter: (_req: Request, _res: Response, next: any) => next()
 }));
 
 describe('admin.routes', () => {
   const app = express();
-  app.use(express.json());
-  app.use('/admin', adminRoutes);
+
+  beforeAll(() => {
+    app.use(express.json());
+    app.use('/admin', adminRoutes);
+  });
 
   test('GET /admin', async () => {
     const res = await request(app).get('/admin');
@@ -59,6 +85,13 @@ describe('admin.routes', () => {
 
   test('PATCH /admin/:id/aprovar', async () => {
     const res = await request(app).patch('/admin/123/aprovar');
+    expect(res.status).toBe(200);
+  });
+
+  test('PATCH /admin/config/aprovacao-automatica', async () => {
+    const res = await request(app).patch(
+      '/admin/config/aprovacao-automatica'
+    );
     expect(res.status).toBe(200);
   });
 

@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for routes/cadastro.routes.ts</title>
+    <title>Code coverage report for routes/exercicios.routes.ts</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../prettify.css" />
     <link rel="stylesheet" href="../base.css" />
@@ -19,7 +19,7 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../index.html">All files</a> / <a href="index.html">routes</a> cadastro.routes.ts</h1>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">routes</a> exercicios.routes.ts</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
@@ -86,7 +86,10 @@
 <a name='L21'></a><a href='#L21'>21</a>
 <a name='L22'></a><a href='#L22'>22</a>
 <a name='L23'></a><a href='#L23'>23</a>
-<a name='L24'></a><a href='#L24'>24</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -94,42 +97,48 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Router } from 'express';
 import {
-  registrarUsuario,
-  ativarSenha,
-  solicitarResetSenha,
-  resetarSenha,
-  solicitarResetEmail,
-  resetarEmail
-} from '../controllers/cadastro.controller';
+  listarExercicios,
+  adicionarExercicio,
+  deletarExercicio,
+  responderExercicio
+} from '../controllers/exercicios.controller';
+&nbsp;
+import { auth } from '../middlewares/auth';
+import { adminOnly } from '../middlewares/adminOnly';
 &nbsp;
 const router = Router();
 &nbsp;
-router.post('/registrar', registrarUsuario);
+// Listar exercícios de um conteúdo (apenas autenticado)
+router.get('/:aulaId/:conteudoId', auth, listarExercicios);
 &nbsp;
-router.post('/ativar-senha/:token', ativarSenha);
+// Adicionar exercício a um conteúdo (apenas admin)
+router.post('/:aulaId/:conteudoId', auth, adminOnly, adicionarExercicio);
 &nbsp;
-router.post('/solicitar-reset-senha', solicitarResetSenha);
-router.post('/resetar-senha', resetarSenha);
+// Deletar exercício (apenas admin)
+router.delete('/:aulaId/:conteudoId/:exercicioId', auth, adminOnly, deletarExercicio);
 &nbsp;
-router.post('/solicitar-reset-email', solicitarResetEmail);
-router.post('/resetar-email', resetarEmail);
+// Responder exercício (apenas autenticado)
+router.post('/:aulaId/:conteudoId/:exercicioId/responder', auth, responderExercicio);
 &nbsp;
 export default router;
 &nbsp;</pre></td></tr></table></pre>

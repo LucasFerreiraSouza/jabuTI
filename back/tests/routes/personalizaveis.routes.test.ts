@@ -1,79 +1,128 @@
-import request from 'supertest';
-import express from 'express';
+// tests/routes/personalizaveis.routes.test.ts
 
-import adminRoutes from '../../routes/admin.routes';
+import request from "supertest";
+import express, { Request, Response, NextFunction } from "express";
 
-jest.mock('../../controllers/admin.controller', () => ({
-  listarUsuarios: jest.fn((req, res) => res.status(200).json({ ok: true })),
-  buscarUsuarioPorId: jest.fn((req, res) => res.status(200).json({ ok: true })),
-  criarUsuario: jest.fn((req, res) => res.status(201).json({ ok: true })),
-  atualizarUsuario: jest.fn((req, res) => res.status(200).json({ ok: true })),
-  deletarUsuario: jest.fn((req, res) => res.status(200).json({ ok: true })),
-  aprovarUsuario: jest.fn((req, res) => res.status(200).json({ ok: true })),
-  reprovarUsuario: jest.fn((req, res) => res.status(200).json({ ok: true })),
-  promoverAdmin: jest.fn((req, res) => res.status(200).json({ ok: true })),
-  despromoverAdmin: jest.fn((req, res) => res.status(200).json({ ok: true }))
+import personalizaveisRoutes from "../../routes/personalizaveis.routes";
+
+/* =========================
+   Mocks dos controllers
+   ========================= */
+jest.mock("../../controllers/personalizaveis.controller", () => ({
+  alterarBackgroundAula: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({ ok: true })
+  ),
+
+  alterarTextAula: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({ ok: true })
+  ),
+
+  alterarOrdemAula: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({ ok: true })
+  ),
+
+  alterarBackgroundConteudo: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({ ok: true })
+  ),
+
+  alterarTextConteudo: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({ ok: true })
+  ),
+
+  alterarOrdemConteudo: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({ ok: true })
+  ),
+
+  alterarBackgroundSite: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({ ok: true })
+  ),
+
+  alterarTextColorSite: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({ ok: true })
+  )
 }));
 
-jest.mock('../../middlewares/auth', () => ({
-  auth: (_req: any, _res: any, next: any) => next()
+/* =========================
+   Mocks dos middlewares
+   ========================= */
+jest.mock("../../middlewares/auth", () => ({
+  auth: (req: Request, _res: Response, next: NextFunction) => {
+    (req as any).user = { id: "1", role: "admin" };
+    next();
+  }
 }));
 
-jest.mock('../../middlewares/adminOnly', () => ({
-  adminOnly: (_req: any, _res: any, next: any) => next()
+jest.mock("../../middlewares/adminOnly", () => ({
+  adminOnly: (_req: Request, _res: Response, next: NextFunction) => next()
 }));
 
-jest.mock('../../middlewares/rateLimit', () => ({
-  emailLimiter: (_req: any, _res: any, next: any) => next()
-}));
-
-describe('admin.routes', () => {
+describe("personalizaveis.routes", () => {
   const app = express();
+
   app.use(express.json());
-  app.use('/admin', adminRoutes);
+  app.use("/personalizaveis", personalizaveisRoutes);
 
-  test('GET /admin', async () => {
-    const res = await request(app).get('/admin');
+  test("PATCH /personalizaveis/aula/:aulaId/background", async () => {
+    const res = await request(app)
+      .patch("/personalizaveis/aula/1/background")
+      .send({ color: "#000" });
+
     expect(res.status).toBe(200);
   });
 
-  test('GET /admin/:id', async () => {
-    const res = await request(app).get('/admin/123');
+  test("PATCH /personalizaveis/aula/:aulaId/text", async () => {
+    const res = await request(app)
+      .patch("/personalizaveis/aula/1/text")
+      .send({ color: "#fff" });
+
     expect(res.status).toBe(200);
   });
 
-  test('POST /admin', async () => {
-    const res = await request(app).post('/admin').send({});
-    expect(res.status).toBe(201);
-  });
+  test("PATCH /personalizaveis/aula/:aulaId/ordem", async () => {
+    const res = await request(app)
+      .patch("/personalizaveis/aula/1/ordem")
+      .send({ ordem: 2 });
 
-  test('PUT /admin/:id', async () => {
-    const res = await request(app).put('/admin/123').send({});
     expect(res.status).toBe(200);
   });
 
-  test('DELETE /admin/:id', async () => {
-    const res = await request(app).delete('/admin/123');
+  test("PATCH /personalizaveis/aula/:aulaId/conteudo/:conteudoId/background", async () => {
+    const res = await request(app)
+      .patch("/personalizaveis/aula/1/conteudo/2/background")
+      .send({ color: "#123" });
+
     expect(res.status).toBe(200);
   });
 
-  test('PATCH /admin/:id/aprovar', async () => {
-    const res = await request(app).patch('/admin/123/aprovar');
+  test("PATCH /personalizaveis/aula/:aulaId/conteudo/:conteudoId/text", async () => {
+    const res = await request(app)
+      .patch("/personalizaveis/aula/1/conteudo/2/text")
+      .send({ color: "#456" });
+
     expect(res.status).toBe(200);
   });
 
-  test('PATCH /admin/:id/reprovar', async () => {
-    const res = await request(app).patch('/admin/123/reprovar');
+  test("PATCH /personalizaveis/aula/:aulaId/conteudo/:conteudoId/ordem", async () => {
+    const res = await request(app)
+      .patch("/personalizaveis/aula/1/conteudo/2/ordem")
+      .send({ ordem: 3 });
+
     expect(res.status).toBe(200);
   });
 
-  test('PATCH /admin/:id/promover-admin', async () => {
-    const res = await request(app).patch('/admin/123/promover-admin');
+  test("PATCH /personalizaveis/site/background", async () => {
+    const res = await request(app)
+      .patch("/personalizaveis/site/background")
+      .send({ color: "#999" });
+
     expect(res.status).toBe(200);
   });
 
-  test('PATCH /admin/:id/despromover-admin', async () => {
-    const res = await request(app).patch('/admin/123/despromover-admin');
+  test("PATCH /personalizaveis/site/text", async () => {
+    const res = await request(app)
+      .patch("/personalizaveis/site/text")
+      .send({ color: "#111" });
+
     expect(res.status).toBe(200);
   });
 });

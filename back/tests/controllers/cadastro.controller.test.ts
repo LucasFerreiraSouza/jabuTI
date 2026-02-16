@@ -6,6 +6,7 @@ import Usuario from '../../models/usuarios.model';
 import { emailService } from '../../utils/emailService';
 import { validarSenhaForte } from '../../utils/senha';
 import validateCaptcha from '../../utils/reCaptcha';
+import SistemaConfig from '../../models/sistema.model';
 
 import {
   registrarUsuario,
@@ -16,21 +17,31 @@ import {
   ativarSenha
 } from '../../controllers/cadastro.controller';
 
+// =========================
+// MOCKS
+// =========================
 jest.mock('../../utils/reCaptcha');
 jest.mock('../../utils/emailService');
 jest.mock('../../utils/senha');
 jest.mock('bcrypt');
-
-// NÃO COLOQUE O MOCK AQUI
 jest.mock('../../models/usuarios.model');
+jest.mock('../../models/sistema.model'); // mock do SistemaConfig
 
 describe('cadastro.controller', () => {
+
+  beforeAll(() => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterAll(() => {
+    (console.error as jest.Mock).mockRestore();
+  });
+
   let req: any;
   let res: Partial<Response>;
 
   beforeEach(() => {
     jest.resetAllMocks();
-
     req = { body: {} };
     res = {
       status: jest.fn().mockReturnThis(),
@@ -43,9 +54,7 @@ describe('cadastro.controller', () => {
   // =========================
   test('deve retornar 400 se captcha não informado', async () => {
     req.body = { nome: 'Lucas', email: 'email@test.com' };
-
     await registrarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({ erro: 'Captcha é obrigatório' });
   });
@@ -53,9 +62,7 @@ describe('cadastro.controller', () => {
   test('deve retornar 401 se captcha inválido', async () => {
     req.body = { nome: 'Lucas', email: 'email@test.com', captchaToken: 'token' };
     (validateCaptcha as jest.Mock).mockResolvedValue(false);
-
     await registrarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith({ erro: 'Captcha inválido' });
   });
@@ -63,9 +70,7 @@ describe('cadastro.controller', () => {
   test('deve retornar 400 se nome ou email não enviados', async () => {
     req.body = { nome: 'Lucas', captchaToken: 'token' };
     (validateCaptcha as jest.Mock).mockResolvedValue(true);
-
     await registrarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
       erro: 'Nome e email são obrigatórios'
@@ -76,9 +81,7 @@ describe('cadastro.controller', () => {
     req.body = { nome: 'Lucas', email: 'email@test.com', captchaToken: 'token' };
     (validateCaptcha as jest.Mock).mockResolvedValue(true);
     (Usuario.findOne as jest.Mock).mockResolvedValue({});
-
     await registrarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.json).toHaveBeenCalledWith({ erro: 'Email já cadastrado' });
   });
@@ -88,9 +91,7 @@ describe('cadastro.controller', () => {
     (validateCaptcha as jest.Mock).mockResolvedValue(true);
     (Usuario.findOne as jest.Mock).mockResolvedValue(null);
     (Usuario.create as jest.Mock).mockResolvedValue({});
-
     await registrarUsuario(req, res as Response);
-
     expect(Usuario.create).toHaveBeenCalled();
     expect(emailService.cadastroRecebido).toHaveBeenCalledWith('email@test.com', 'Lucas');
     expect(res.status).toHaveBeenCalledWith(201);
@@ -102,13 +103,53 @@ describe('cadastro.controller', () => {
   test('deve retornar 500 em registrarUsuario se ocorrer erro', async () => {
     req.body = { nome: 'Lucas', email: 'email@test.com', captchaToken: 'token' };
     (validateCaptcha as jest.Mock).mockRejectedValue(new Error('erro'));
-
     await registrarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({ erro: 'Erro ao registrar usuário' });
   });
 
+  // =========================
+  // registrarUsuario - aprovação automática
+  // =========================
+  test('deve registrar usuário com aprovação automática e enviar email de ativação', async () => {
+    req.body = { nome: 'Lucas', email: 'email@test.com', captchaToken: 'token' };
+
+    (validateCaptcha as jest.Mock).mockResolvedValue(true);
+    (Usuario.findOne as jest.Mock).mockResolvedValue(null);
+    (Usuario.create as jest.Mock).mockResolvedValue({});
+    (emailService.enviarAtivacaoSenha as jest.Mock).mockResolvedValue(undefined);
+
+    // MOCK de SistemaConfig.findOne
+    (SistemaConfig.findOne as jest.Mock).mockResolvedValue({
+      aprovacaoAutomaticaUsuarios: true
+    });
+
+    await registrarUsuario(req, res as Response);
+
+    expect(Usuario.create).toHaveBeenCalledWith(expect.objectContaining({
+      nome: 'Lucas',
+      email: 'email@test.com',
+      role: 'ESTUDANTE',
+      status: 'APROVADO',
+      senha: null,
+      doisFatoresAtivo: false,
+      tokenAtivacaoSenha: expect.any(String),
+      tokenAtivacaoExpira: expect.any(Date)
+    }));
+
+    expect(emailService.enviarAtivacaoSenha).toHaveBeenCalledWith(
+      'email@test.com',
+      'Lucas',
+      expect.stringContaining('ativar-senha?token=')
+    );
+
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith({
+      mensagem: 'Cadastro realizado. Enviamos um e-mail para ativação da sua senha.'
+    });
+  });
+
+  
   // =========================
   // solicitarResetSenha
   // =========================
@@ -487,5 +528,6 @@ test('deve retornar 500 em ativarSenha se ocorrer erro', async () => {
   expect(res.status).toHaveBeenCalledWith(500);
   expect(res.json).toHaveBeenCalledWith({ erro: 'Erro ao ativar senha' });
 });
+
 
 });

@@ -1,462 +1,340 @@
-import { Request, Response } from 'express';
-import bcrypt from 'bcrypt';
-import crypto from 'crypto';
-
-import Usuario from '../../models/usuarios.model';
-import {Aula} from '../../models/aulas.model';
-import { emailService } from '../../utils/emailService';
-import { validarSenhaForte } from '../../utils/senha';
+import { Response } from "express";
+import cloudinary from "../../config/cloudinary";
+import Usuario from "../../models/usuarios.model";
+import { Aula } from "../../models/aulas.model";
 
 import {
-  listarUsuarios,
-  buscarUsuarioPorId,
-  criarUsuario,
-  atualizarUsuario,
-  deletarUsuario,
-  aprovarUsuario,
-  reprovarUsuario,
-  promoverAdmin,
-  despromoverAdmin
-} from '../../controllers/admin.controller';
+  uploadAvatar,
+  deleteAvatar,
+  uploadImagemConteudo,
+  deleteImagemConteudo
+} from "../../controllers/arquivos.controller";
 
-jest.mock('../../models/usuarios.model');
-jest.mock('../../models/aulas.model');
-jest.mock('../../utils/emailService');
-jest.mock('../../utils/senha');
-jest.mock('bcrypt');
+jest.mock("../../models/usuarios.model");
+jest.mock("../../models/aulas.model");
+jest.mock("../../config/cloudinary", () => ({
+  uploader: {
+    upload: jest.fn(),
+    destroy: jest.fn()
+  }
+}));
 
-describe('admin.controller', () => {
+describe("upload.controller", () => {
   let req: any;
   let res: Partial<Response>;
 
   beforeEach(() => {
-    req = { body: {}, params: {} };
-    res = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn()
-    };
-  });
+  jest.spyOn(console, "error").mockImplementation(() => {});
+
+  (cloudinary.uploader.upload as jest.Mock).mockClear();
+  (cloudinary.uploader.destroy as jest.Mock).mockClear();
+
+  req = {
+    body: {},
+    file: undefined,
+    user: { id: "userId" }
+  };
+
+  res = {
+    status: jest.fn().mockReturnThis(),
+    json: jest.fn()
+  };
+});
 
   afterEach(() => {
-    jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
-  // =========================
-  // listarUsuarios
-  // =========================
-  test('deve listar usuários', async () => {
-    (Usuario.find as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue([])
-    });
+  // ======================================================
+  // uploadAvatar
+  // ======================================================
 
-    await listarUsuarios(req, res as Response);
+  test("deve retornar 400 se não enviar arquivo", async () => {
+    await uploadAvatar(req, res as Response);
 
-    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  test('deve retornar 500 em caso de erro ao listar usuários', async () => {
-    (Usuario.find as jest.Mock).mockImplementation(() => {
-      throw new Error();
+  test("deve fazer upload do avatar corretamente", async () => {
+    req.file = { path: "file.png" };
+
+    (cloudinary.uploader.upload as jest.Mock).mockResolvedValue({
+      secure_url: "http://cloud/avatar.png"
     });
 
-    await listarUsuarios(req, res as Response);
+    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
+
+    await uploadAvatar(req, res as Response);
+
+    expect(cloudinary.uploader.upload).toHaveBeenCalled();
+    expect(Usuario.findByIdAndUpdate).toHaveBeenCalledWith("userId", {
+      avatar: { url: "http://cloud/avatar.png" }
+    });
+
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith({
+      url: "http://cloud/avatar.png"
+    });
+  });
+
+  test("deve retornar 500 se ocorrer erro no uploadAvatar", async () => {
+    req.file = { path: "file.png" };
+
+    (cloudinary.uploader.upload as jest.Mock).mockRejectedValue(new Error());
+
+    await uploadAvatar(req, res as Response);
 
     expect(res.status).toHaveBeenCalledWith(500);
   });
 
-  // =========================
-  // buscarUsuarioPorId
-  // =========================
-  test('deve retornar 404 se usuário não existir', async () => {
-    req.params.id = '123';
+  // ======================================================
+  // deleteAvatar
+  // ======================================================
 
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(null)
-    });
+  test("deve retornar 400 se url não for enviada", async () => {
+    await deleteAvatar(req, res as Response);
 
-    await buscarUsuarioPorId(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  test('deve retornar usuário por id', async () => {
-    req.params.id = '123';
+  test("deve deletar avatar corretamente", async () => {
+    req.body = {
+      url: "https://res.cloudinary.com/demo/image/upload/v123/avatars/test.png"
+    };
 
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue({ _id: '123' })
+    (cloudinary.uploader.destroy as jest.Mock).mockResolvedValue({});
+
+    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
+
+    await deleteAvatar(req, res as Response);
+
+    expect(cloudinary.uploader.destroy).toHaveBeenCalledWith("avatars/test");
+
+    expect(Usuario.findByIdAndUpdate).toHaveBeenCalledWith("userId", {
+      $unset: { avatar: "" }
     });
-
-    await buscarUsuarioPorId(req, res as Response);
 
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test('deve retornar 400 se id inválido', async () => {
-    req.params.id = 'invalid';
+  test("deve retornar 500 se ocorrer erro no deleteAvatar", async () => {
+    req.body = {
+      url: "https://res.cloudinary.com/demo/image/upload/v123/avatars/test.png"
+    };
 
-    (Usuario.findById as jest.Mock).mockImplementation(() => {
-      throw new Error();
+    (cloudinary.uploader.destroy as jest.Mock).mockRejectedValue(new Error());
+
+    await deleteAvatar(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+  });
+
+  // ======================================================
+  // uploadImagemConteudo
+  // ======================================================
+
+  test("deve retornar 400 se não enviar arquivo", async () => {
+    await uploadImagemConteudo(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  test("deve retornar 400 se aulaId não for enviado", async () => {
+    req.file = { path: "file.png" };
+
+    await uploadImagemConteudo(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  test("deve retornar 400 se conteudoId não for enviado", async () => {
+    req.file = { path: "file.png" };
+    req.body = { aulaId: "a1" };
+
+    await uploadImagemConteudo(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  test("deve retornar 404 se aula não existir", async () => {
+    req.file = { path: "file.png" };
+    req.body = { aulaId: "a1", conteudoId: "c1" };
+
+    (Aula.findById as jest.Mock).mockResolvedValue(null);
+
+    await uploadImagemConteudo(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test("deve retornar 404 se conteúdo não existir", async () => {
+    req.file = { path: "file.png" };
+    req.body = { aulaId: "a1", conteudoId: "c1" };
+
+    const aulaMock = {
+      conteudos: {
+        id: jest.fn().mockReturnValue(null)
+      }
+    };
+
+    (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
+
+    await uploadImagemConteudo(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test("deve fazer upload da imagem do conteúdo corretamente", async () => {
+    req.file = { path: "file.png" };
+    req.body = { aulaId: "a1", conteudoId: "c1" };
+
+    const conteudoMock: any = {};
+
+    const aulaMock: any = {
+      conteudos: {
+        id: jest.fn().mockReturnValue(conteudoMock)
+      },
+      save: jest.fn()
+    };
+
+    (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
+
+    (cloudinary.uploader.upload as jest.Mock).mockResolvedValue({
+      secure_url: "http://cloud/aula.png"
     });
 
-    await buscarUsuarioPorId(req, res as Response);
+    await uploadImagemConteudo(req, res as Response);
 
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  // =========================
-  // criarUsuario
-  // =========================
-  test('deve retornar 400 se campos obrigatórios não enviados', async () => {
-    req.body = { nome: 'Lucas' };
-
-    await criarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  test('deve retornar 400 se senha fraca', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'fraca'
-    };
-
-    (validarSenhaForte as jest.Mock).mockReturnValue(false);
-
-    await criarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  test('deve retornar 409 se email já existir', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'Senha@123'
-    };
-
-    (validarSenhaForte as jest.Mock).mockReturnValue(true);
-    (Usuario.findOne as jest.Mock).mockResolvedValue({});
-
-    await criarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(409);
-  });
-
-  test('deve criar usuário com sucesso', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'Senha@123'
-    };
-
-    (validarSenhaForte as jest.Mock).mockReturnValue(true);
-    (Usuario.findOne as jest.Mock).mockResolvedValue(null);
-    (bcrypt.hash as jest.Mock).mockResolvedValue('hash');
-    (Usuario.create as jest.Mock).mockResolvedValue({
-      _id: '123',
-      nome: 'Lucas',
-      email: 'test@test.com',
-      role: 'ESTUDANTE',
-      status: 'APROVADO'
+    expect(conteudoMock.imagem).toEqual({
+      url: "http://cloud/aula.png"
     });
 
-    await criarUsuario(req, res as Response);
+    expect(aulaMock.save).toHaveBeenCalled();
 
     expect(res.status).toHaveBeenCalledWith(201);
   });
 
-  test('deve retornar 500 se ocorrer erro ao criar usuário', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'Senha@123'
-    };
+  test("deve retornar 500 se ocorrer erro no uploadImagemConteudo", async () => {
+    req.file = { path: "file.png" };
+    req.body = { aulaId: "a1", conteudoId: "c1" };
 
-    (validarSenhaForte as jest.Mock).mockReturnValue(true);
-    (Usuario.findOne as jest.Mock).mockResolvedValue(null);
-    (bcrypt.hash as jest.Mock).mockResolvedValue('hash');
-    (Usuario.create as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
+    (Aula.findById as jest.Mock).mockRejectedValue(new Error());
 
-    await criarUsuario(req, res as Response);
+    await uploadImagemConteudo(req, res as Response);
 
     expect(res.status).toHaveBeenCalledWith(500);
   });
 
-  // =========================
-  // atualizarUsuario
-  // =========================
-  test('deve retornar 404 se usuário não existir ao atualizar', async () => {
-    req.params.id = '123';
+  // ======================================================
+  // deleteImagemConteudo
+  // ======================================================
 
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
-    await atualizarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve atualizar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({});
-
-    await atualizarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  test('deve retornar 400 se ocorrer erro ao atualizar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await atualizarUsuario(req, res as Response);
+  test("deve retornar 400 se aulaId não for enviado", async () => {
+    await deleteImagemConteudo(req, res as Response);
 
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  // =========================
-  // deletarUsuario
-  // =========================
-  test('deve retornar 404 se usuário não existir ao deletar', async () => {
-    req.params.id = '123';
+  test("deve retornar 400 se conteudoId não for enviado", async () => {
+    req.body = { aulaId: "a1" };
 
-    (Usuario.findByIdAndDelete as jest.Mock).mockResolvedValue(null);
+    await deleteImagemConteudo(req, res as Response);
 
-    await deletarUsuario(req, res as Response);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  test("deve retornar 404 se aula não existir", async () => {
+    req.body = { aulaId: "a1", conteudoId: "c1" };
+
+    (Aula.findById as jest.Mock).mockResolvedValue(null);
+
+    await deleteImagemConteudo(req, res as Response);
 
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve deletar usuário e aulas', async () => {
-    req.params.id = '123';
+  test("deve retornar 404 se conteúdo não existir", async () => {
+    req.body = { aulaId: "a1", conteudoId: "c1" };
 
-    (Usuario.findByIdAndDelete as jest.Mock).mockResolvedValue({});
-    (Aula.deleteMany as jest.Mock).mockResolvedValue({});
-
-    await deletarUsuario(req, res as Response);
-
-    expect(Aula.deleteMany).toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  test('deve retornar 500 se ocorrer erro ao deletar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndDelete as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await deletarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(500);
-  });
-
-  // =========================
-  // aprovarUsuario
-  // =========================
-  test('deve retornar 404 se usuário não existir ao aprovar', async () => {
-    req.params.id = '123';
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(null)
-    });
-
-    await aprovarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve retornar 400 se usuário já estiver aprovado', async () => {
-    req.params.id = '123';
-
-    const usuarioMock: any = {
-      status: 'APROVADO',
-      email: 'test@test.com',
-      nome: 'Lucas'
+    const aulaMock = {
+      conteudos: {
+        id: jest.fn().mockReturnValue(null)
+      }
     };
 
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(usuarioMock)
-    });
+    (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
 
-    await aprovarUsuario(req, res as Response);
+    await deleteImagemConteudo(req, res as Response);
 
-    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve retornar 400 se usuário já possui token válido', async () => {
-    req.params.id = '123';
+  test("deve remover imagem sem chamar cloudinary se url não for enviada", async () => {
+    req.body = { aulaId: "a1", conteudoId: "c1" };
 
-    const usuarioMock: any = {
-      status: 'PENDENTE',
-      email: 'test@test.com',
-      nome: 'Lucas',
-      tokenAtivacaoSenha: 'token',
-      tokenAtivacaoExpira: new Date(Date.now() + 10000)
+    const conteudoMock: any = {
+      imagem: { url: "x" }
     };
 
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(usuarioMock)
-    });
-
-    await aprovarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  test('deve aprovar usuário e enviar email', async () => {
-    req.params.id = '123';
-
-    const usuarioMock: any = {
-      status: 'PENDENTE',
-      email: 'test@test.com',
-      nome: 'Lucas',
+    const aulaMock: any = {
+      conteudos: {
+        id: jest.fn().mockReturnValue(conteudoMock)
+      },
       save: jest.fn()
     };
 
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(usuarioMock)
-    });
+    (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
 
-    jest.spyOn(crypto, 'randomBytes').mockReturnValue(
-      Buffer.from('token') as any
-    );
+    await deleteImagemConteudo(req, res as Response);
 
-    await aprovarUsuario(req, res as Response);
+    expect(cloudinary.uploader.destroy).not.toHaveBeenCalled();
+    expect(conteudoMock.imagem).toBeUndefined();
+    expect(aulaMock.save).toHaveBeenCalled();
 
-    expect(emailService.enviarAtivacaoSenha).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test('deve retornar 500 se ocorrer erro ao aprovar usuário', async () => {
-    req.params.id = '123';
+  test("deve remover imagem chamando cloudinary quando url existir", async () => {
+    req.body = {
+      aulaId: "a1",
+      conteudoId: "c1",
+      url: "https://res.cloudinary.com/demo/image/upload/v123/aulas/img.png"
+    };
 
-    (Usuario.findById as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
+    const conteudoMock: any = {
+      imagem: { url: "x" }
+    };
 
-    await aprovarUsuario(req, res as Response);
+    const aulaMock: any = {
+      conteudos: {
+        id: jest.fn().mockReturnValue(conteudoMock)
+      },
+      save: jest.fn()
+    };
+
+    (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
+
+    (cloudinary.uploader.destroy as jest.Mock).mockResolvedValue({});
+
+    await deleteImagemConteudo(req, res as Response);
+
+    expect(cloudinary.uploader.destroy).toHaveBeenCalledWith("aulas/img");
+    expect(conteudoMock.imagem).toBeUndefined();
+    expect(aulaMock.save).toHaveBeenCalled();
+
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  test("deve retornar 500 se ocorrer erro no deleteImagemConteudo", async () => {
+    req.body = {
+      aulaId: "a1",
+      conteudoId: "c1"
+    };
+
+    (Aula.findById as jest.Mock).mockRejectedValue(new Error());
+
+    await deleteImagemConteudo(req, res as Response);
 
     expect(res.status).toHaveBeenCalledWith(500);
-  });
-
-  // =========================
-  // reprovarUsuario
-  // =========================
-  test('deve retornar 404 se usuário não existir ao reprovar', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
-    await reprovarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve reprovar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({
-      email: 'test@test.com',
-      nome: 'Lucas'
-    });
-
-    await reprovarUsuario(req, res as Response);
-
-    expect(emailService.reprovado).toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  test('deve retornar 400 se ocorrer erro ao reprovar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await reprovarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  // =========================
-  // promover / despromover admin
-  // =========================
-  test('deve retornar 404 se usuário não existir ao promover', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
-    await promoverAdmin(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve promover usuário a admin', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({
-      email: 'test@test.com',
-      nome: 'Lucas'
-    });
-
-    await promoverAdmin(req, res as Response);
-
-    expect(emailService.promovidoAdmin).toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  test('deve retornar 400 se ocorrer erro ao promover usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await promoverAdmin(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  test('deve retornar 404 se usuário não existir ao despromover', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
-    await despromoverAdmin(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve despromover admin', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({
-      email: 'test@test.com',
-      nome: 'Lucas'
-    });
-
-    await despromoverAdmin(req, res as Response);
-
-    expect(emailService.despromovidoAdmin).toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  test('deve retornar 400 se ocorrer erro ao despromover usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await despromoverAdmin(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
   });
 });

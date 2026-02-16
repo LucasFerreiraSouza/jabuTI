@@ -1,11 +1,11 @@
-import { Request, Response } from 'express';
-import bcrypt from 'bcrypt';
+import { Response } from 'express';
 import crypto from 'crypto';
 
 import Usuario from '../../models/usuarios.model';
-import {Aula} from '../../models/aulas.model';
+import { Aula } from '../../models/aulas.model';
+import SistemaConfig from '../../models/sistema.model';
+
 import { emailService } from '../../utils/emailService';
-import { validarSenhaForte } from '../../utils/senha';
 
 import {
   listarUsuarios,
@@ -16,21 +16,31 @@ import {
   aprovarUsuario,
   reprovarUsuario,
   promoverAdmin,
-  despromoverAdmin
+  despromoverAdmin,
+  aprovacaoAutomatica
 } from '../../controllers/admin.controller';
 
 jest.mock('../../models/usuarios.model');
 jest.mock('../../models/aulas.model');
+jest.mock('../../models/sistema.model');
 jest.mock('../../utils/emailService');
-jest.mock('../../utils/senha');
-jest.mock('bcrypt');
 
 describe('admin.controller', () => {
+
+  beforeAll(() => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterAll(() => {
+    (console.error as jest.Mock).mockRestore();
+  });
+
   let req: any;
   let res: Partial<Response>;
 
   beforeEach(() => {
     req = { body: {}, params: {} };
+
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn()
@@ -44,419 +54,268 @@ describe('admin.controller', () => {
   // =========================
   // listarUsuarios
   // =========================
-  test('deve listar usuários', async () => {
-    (Usuario.find as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue([])
-    });
-
+  test('listarUsuarios - deve listar usuários', async () => {
+    (Usuario.find as jest.Mock).mockReturnValue({ select: jest.fn().mockResolvedValue([]) });
     await listarUsuarios(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test('deve retornar 500 em caso de erro ao listar usuários', async () => {
-    (Usuario.find as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
+  test('listarUsuarios - retorna 500 em caso de erro', async () => {
+    (Usuario.find as jest.Mock).mockImplementation(() => { throw new Error(); });
     await listarUsuarios(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(500);
   });
 
   // =========================
   // buscarUsuarioPorId
   // =========================
-  test('deve retornar 404 se usuário não existir', async () => {
+  test('buscarUsuarioPorId - retorna 404 se não existir', async () => {
     req.params.id = '123';
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(null)
-    });
-
+    (Usuario.findById as jest.Mock).mockReturnValue({ select: jest.fn().mockResolvedValue(null) });
     await buscarUsuarioPorId(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve retornar usuário por id', async () => {
+  test('buscarUsuarioPorId - retorna usuário existente', async () => {
     req.params.id = '123';
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue({ _id: '123' })
-    });
-
+    (Usuario.findById as jest.Mock).mockReturnValue({ select: jest.fn().mockResolvedValue({ _id: '123' }) });
     await buscarUsuarioPorId(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test('deve retornar 400 se id inválido', async () => {
+  test('buscarUsuarioPorId - retorna 400 se id inválido', async () => {
     req.params.id = 'invalid';
-
-    (Usuario.findById as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
+    (Usuario.findById as jest.Mock).mockImplementation(() => { throw new Error(); });
     await buscarUsuarioPorId(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
   // =========================
   // criarUsuario
   // =========================
-  test('deve retornar 400 se campos obrigatórios não enviados', async () => {
+  test('criarUsuario - retorna 400 se nome ou email ausentes', async () => {
     req.body = { nome: 'Lucas' };
-
     await criarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  test('deve retornar 400 se senha fraca', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'fraca'
-    };
-
-    (validarSenhaForte as jest.Mock).mockReturnValue(false);
-
-    await criarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  test('deve retornar 409 se email já existir', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'Senha@123'
-    };
-
-    (validarSenhaForte as jest.Mock).mockReturnValue(true);
+  test('criarUsuario - retorna 409 se email já existir', async () => {
+    req.body = { nome: 'Lucas', email: 'test@test.com' };
     (Usuario.findOne as jest.Mock).mockResolvedValue({});
-
     await criarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(409);
   });
 
-  test('deve criar usuário com sucesso', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'Senha@123'
-    };
-
-    (validarSenhaForte as jest.Mock).mockReturnValue(true);
+  test('criarUsuario - cria usuário como pendente', async () => {
+    req.body = { nome: 'Lucas', email: 'test@test.com' };
     (Usuario.findOne as jest.Mock).mockResolvedValue(null);
-    (bcrypt.hash as jest.Mock).mockResolvedValue('hash');
-    (Usuario.create as jest.Mock).mockResolvedValue({
-      _id: '123',
-      nome: 'Lucas',
-      email: 'test@test.com',
-      role: 'ESTUDANTE',
-      status: 'APROVADO'
-    });
-
+    (SistemaConfig.findOne as jest.Mock).mockResolvedValue({ aprovacaoAutomaticaUsuarios: false });
+    (Usuario.create as jest.Mock).mockResolvedValue({ _id: '123', nome: 'Lucas', email: 'test@test.com', role: 'ESTUDANTE', status: 'PENDENTE' });
     await criarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(201);
   });
 
-  test('deve retornar 500 se ocorrer erro ao criar usuário', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'Senha@123'
-    };
-
-    (validarSenhaForte as jest.Mock).mockReturnValue(true);
+  test('criarUsuario - retorna 500 se ocorrer erro', async () => {
+    req.body = { nome: 'Lucas', email: 'test@test.com' };
     (Usuario.findOne as jest.Mock).mockResolvedValue(null);
-    (bcrypt.hash as jest.Mock).mockResolvedValue('hash');
-    (Usuario.create as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
+    (SistemaConfig.findOne as jest.Mock).mockResolvedValue({ aprovacaoAutomaticaUsuarios: false });
+    (Usuario.create as jest.Mock).mockImplementation(() => { throw new Error(); });
     await criarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(500);
   });
 
   // =========================
   // atualizarUsuario
   // =========================
-  test('deve retornar 404 se usuário não existir ao atualizar', async () => {
+  test('atualizarUsuario - retorna 404 se não existir', async () => {
     req.params.id = '123';
-
     (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
     await atualizarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve atualizar usuário', async () => {
+  test('atualizarUsuario - atualiza usuário', async () => {
     req.params.id = '123';
-
     (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({});
-
     await atualizarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test('deve retornar 400 se ocorrer erro ao atualizar usuário', async () => {
+  test('atualizarUsuario - retorna 400 em caso de erro', async () => {
     req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
+    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => { throw new Error(); });
     await atualizarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
   // =========================
   // deletarUsuario
   // =========================
-  test('deve retornar 404 se usuário não existir ao deletar', async () => {
+  test('deletarUsuario - retorna 404 se não existir', async () => {
     req.params.id = '123';
-
-    (Usuario.findByIdAndDelete as jest.Mock).mockResolvedValue(null);
-
+    (Usuario.findById as jest.Mock).mockResolvedValue(null);
     await deletarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve deletar usuário e aulas', async () => {
+  test('deletarUsuario - deleta usuário e aulas', async () => {
     req.params.id = '123';
-
+    (Usuario.findById as jest.Mock).mockResolvedValue({ _id: '123', avatar: null });
     (Usuario.findByIdAndDelete as jest.Mock).mockResolvedValue({});
     (Aula.deleteMany as jest.Mock).mockResolvedValue({});
-
     await deletarUsuario(req, res as Response);
-
-    expect(Aula.deleteMany).toHaveBeenCalled();
+    expect(Aula.deleteMany).toHaveBeenCalledWith({ criadoPor: '123' });
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test('deve retornar 500 se ocorrer erro ao deletar usuário', async () => {
+  test('deletarUsuario - retorna 500 se ocorrer erro', async () => {
     req.params.id = '123';
-
-    (Usuario.findByIdAndDelete as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
+    (Usuario.findById as jest.Mock).mockImplementation(() => { throw new Error(); });
     await deletarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(500);
   });
 
   // =========================
   // aprovarUsuario
   // =========================
-  test('deve retornar 404 se usuário não existir ao aprovar', async () => {
+  test('aprovarUsuario - retorna 404 se não existir', async () => {
     req.params.id = '123';
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(null)
-    });
-
+    (Usuario.findById as jest.Mock).mockReturnValue({ select: jest.fn().mockResolvedValue(null) });
     await aprovarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve retornar 400 se usuário já estiver aprovado', async () => {
+  test('aprovarUsuario - retorna 400 se já aprovado', async () => {
     req.params.id = '123';
-
-    const usuarioMock: any = {
-      status: 'APROVADO',
-      email: 'test@test.com',
-      nome: 'Lucas'
-    };
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(usuarioMock)
-    });
-
+    (Usuario.findById as jest.Mock).mockReturnValue({ select: jest.fn().mockResolvedValue({ status: 'APROVADO', email: 'test@test.com', nome: 'Lucas' }) });
     await aprovarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  test('deve retornar 400 se usuário já possui token válido', async () => {
+  test('aprovarUsuario - retorna 400 se token válido', async () => {
     req.params.id = '123';
-
-    const usuarioMock: any = {
-      status: 'PENDENTE',
-      email: 'test@test.com',
-      nome: 'Lucas',
-      tokenAtivacaoSenha: 'token',
-      tokenAtivacaoExpira: new Date(Date.now() + 10000)
-    };
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(usuarioMock)
-    });
-
+    const usuarioMock: any = { status: 'PENDENTE', email: 'test@test.com', nome: 'Lucas', tokenAtivacaoSenha: 'token', tokenAtivacaoExpira: new Date(Date.now() + 10000) };
+    (Usuario.findById as jest.Mock).mockReturnValue({ select: jest.fn().mockResolvedValue(usuarioMock) });
     await aprovarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  test('deve aprovar usuário e enviar email', async () => {
+  test('aprovarUsuario - aprova usuário e envia email', async () => {
     req.params.id = '123';
-
-    const usuarioMock: any = {
-      status: 'PENDENTE',
-      email: 'test@test.com',
-      nome: 'Lucas',
-      save: jest.fn()
-    };
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(usuarioMock)
-    });
-
-    jest.spyOn(crypto, 'randomBytes').mockReturnValue(
-      Buffer.from('token') as any
-    );
-
+    const usuarioMock: any = { status: 'PENDENTE', email: 'test@test.com', nome: 'Lucas', save: jest.fn() };
+    (Usuario.findById as jest.Mock).mockReturnValue({ select: jest.fn().mockResolvedValue(usuarioMock) });
+    jest.spyOn(crypto, 'randomBytes').mockReturnValue(Buffer.from('token') as any);
     await aprovarUsuario(req, res as Response);
-
     expect(emailService.enviarAtivacaoSenha).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test('deve retornar 500 se ocorrer erro ao aprovar usuário', async () => {
+  test('aprovarUsuario - retorna 500 se ocorrer erro', async () => {
     req.params.id = '123';
-
-    (Usuario.findById as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
+    (Usuario.findById as jest.Mock).mockImplementation(() => { throw new Error(); });
     await aprovarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(500);
   });
 
   // =========================
   // reprovarUsuario
   // =========================
-  test('deve retornar 404 se usuário não existir ao reprovar', async () => {
+  test('reprovarUsuario - retorna 404 se não existir', async () => {
     req.params.id = '123';
-
     (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
     await reprovarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve reprovar usuário', async () => {
+  test('reprovarUsuario - reprova usuário', async () => {
     req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({
-      email: 'test@test.com',
-      nome: 'Lucas'
-    });
-
+    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({ email: 'test@test.com', nome: 'Lucas' });
     await reprovarUsuario(req, res as Response);
-
     expect(emailService.reprovado).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test('deve retornar 400 se ocorrer erro ao reprovar usuário', async () => {
+  test('reprovarUsuario - retorna 400 se ocorrer erro', async () => {
     req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
+    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => { throw new Error(); });
     await reprovarUsuario(req, res as Response);
-
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
   // =========================
-  // promover / despromover admin
+  // promoverAdmin / despromoverAdmin
   // =========================
-  test('deve retornar 404 se usuário não existir ao promover', async () => {
+  const adminTests = [
+    { fn: promoverAdmin, mockMethod: 'promovidoAdmin', msg: 'promover' },
+    { fn: despromoverAdmin, mockMethod: 'despromovidoAdmin', msg: 'despromover' }
+  ];
+
+  adminTests.forEach(({ fn, mockMethod, msg }) => {
+  test(`${msg}Admin - retorna 404 se não existir`, async () => {
     req.params.id = '123';
-
     (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
-    await promoverAdmin(req, res as Response);
-
+    await fn(req, res as Response);
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve promover usuário a admin', async () => {
+  test(`${msg}Admin - envia email e retorna 200`, async () => {
     req.params.id = '123';
-
     (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({
       email: 'test@test.com',
       nome: 'Lucas'
     });
 
-    await promoverAdmin(req, res as Response);
+    await fn(req, res as Response);
 
-    expect(emailService.promovidoAdmin).toHaveBeenCalled();
+    // Chamada correta usando mockMethod
+    expect((emailService as any)[mockMethod]).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test('deve retornar 400 se ocorrer erro ao promover usuário', async () => {
+  test(`${msg}Admin - retorna 400 se erro`, async () => {
     req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await promoverAdmin(req, res as Response);
-
+    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => { throw new Error(); });
+    await fn(req, res as Response);
     expect(res.status).toHaveBeenCalledWith(400);
   });
+});
 
-  test('deve retornar 404 se usuário não existir ao despromover', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
-    await despromoverAdmin(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
+  // =========================
+  // aprovacaoAutomatica
+  // =========================
+  test('aprovacaoAutomatica - retorna 403 se desabilitado', async () => {
+    (SistemaConfig.findOne as jest.Mock).mockResolvedValue({ aprovacaoAutomaticaUsuarios: false });
+    await aprovacaoAutomatica(req, res as Response);
+    expect(res.status).toHaveBeenCalledWith(403);
   });
 
-  test('deve despromover admin', async () => {
-    req.params.id = '123';
+  test('aprovacaoAutomatica - aprova usuários pendentes e envia emails', async () => {
+    const usuarioMock: any = { status: 'PENDENTE', email: 'test@test.com', nome: 'Lucas', save: jest.fn(), tokenAtivacaoSenha: null, tokenAtivacaoExpira: null };
+    (SistemaConfig.findOne as jest.Mock).mockResolvedValue({ aprovacaoAutomaticaUsuarios: true });
+    (Usuario.find as jest.Mock).mockReturnValue({ select: jest.fn().mockResolvedValue([usuarioMock]) });
 
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({
-      email: 'test@test.com',
-      nome: 'Lucas'
-    });
+    jest.spyOn(crypto, 'randomBytes').mockReturnValue(Buffer.from('token') as any);
 
-    await despromoverAdmin(req, res as Response);
+    await aprovacaoAutomatica(req, res as Response);
 
-    expect(emailService.despromovidoAdmin).toHaveBeenCalled();
+    expect(emailService.enviarAtivacaoSenha).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test('deve retornar 400 se ocorrer erro ao despromover usuário', async () => {
-    req.params.id = '123';
+  test('aprovacaoAutomatica - ignora usuários com token válido', async () => {
+    const usuarioMock: any = { status: 'PENDENTE', email: 'test@test.com', nome: 'Lucas', tokenAtivacaoSenha: 'token', tokenAtivacaoExpira: new Date(Date.now() + 10000), save: jest.fn() };
+    (SistemaConfig.findOne as jest.Mock).mockResolvedValue({ aprovacaoAutomaticaUsuarios: true });
+    (Usuario.find as jest.Mock).mockReturnValue({ select: jest.fn().mockResolvedValue([usuarioMock]) });
 
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
+    await aprovacaoAutomatica(req, res as Response);
 
-    await despromoverAdmin(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.status).toHaveBeenCalledWith(200);
   });
+
+  test('aprovacaoAutomatica - retorna 500 se erro', async () => {
+    (SistemaConfig.findOne as jest.Mock).mockImplementation(() => { throw new Error(); });
+    await aprovacaoAutomatica(req, res as Response);
+    expect(res.status).toHaveBeenCalledWith(500);
+  });
+
 });

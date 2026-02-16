@@ -82,7 +82,7 @@ Crie um arquivo `.env` na raiz do diretório `back`:
 
 ```env
 PORT=3000
-MONGO_URI=mongodb://localhost:27017/jabuti
+MONGO_URL=mongodb://localhost:27017/jabuti
 JWT_SECRET=super_secreto_jabuti
 ```
 

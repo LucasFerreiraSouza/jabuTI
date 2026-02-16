@@ -1,36 +1,27 @@
-import { Request, Response } from 'express';
-import bcrypt from 'bcrypt';
-import crypto from 'crypto';
+import { Response } from "express";
+import mongoose from "mongoose";
 
-import Usuario from '../../models/usuarios.model';
-import {Aula} from '../../models/aulas.model';
-import { emailService } from '../../utils/emailService';
-import { validarSenhaForte } from '../../utils/senha';
-
+import { Aula } from "../../models/aulas.model";
 import {
-  listarUsuarios,
-  buscarUsuarioPorId,
-  criarUsuario,
-  atualizarUsuario,
-  deletarUsuario,
-  aprovarUsuario,
-  reprovarUsuario,
-  promoverAdmin,
-  despromoverAdmin
-} from '../../controllers/admin.controller';
+  dashboardExercicio,
+  rankingExercicio
+} from "../../controllers/analiticos.controller";
 
-jest.mock('../../models/usuarios.model');
-jest.mock('../../models/aulas.model');
-jest.mock('../../utils/emailService');
-jest.mock('../../utils/senha');
-jest.mock('bcrypt');
+jest.mock("../../models/aulas.model");
 
-describe('admin.controller', () => {
+describe("dashboard.controller", () => {
+
   let req: any;
   let res: Partial<Response>;
 
   beforeEach(() => {
-    req = { body: {}, params: {} };
+    jest.spyOn(console, "error").mockImplementation(() => {});
+
+    req = {
+      params: {},
+      query: {}
+    };
+
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn()
@@ -38,425 +29,346 @@ describe('admin.controller', () => {
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
-  // =========================
-  // listarUsuarios
-  // =========================
-  test('deve listar usuários', async () => {
-    (Usuario.find as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue([])
-    });
+  // ======================================================
+  // dashboardExercicio
+  // ======================================================
 
-    await listarUsuarios(req, res as Response);
+  test("deve retornar 400 se algum id for inválido", async () => {
+    jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(false);
 
-    expect(res.status).toHaveBeenCalledWith(200);
+    req.params = {
+      aulaId: "1",
+      conteudoId: "2",
+      exercicioId: "3"
+    };
+
+    await dashboardExercicio(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  test('deve retornar 500 em caso de erro ao listar usuários', async () => {
-    (Usuario.find as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
+  test("deve retornar 400 se usuarioId for inválido", async () => {
+    jest
+      .spyOn(mongoose.Types.ObjectId, "isValid")
+      .mockImplementation((id: any) => id !== "usuarioInvalido");
 
-    await listarUsuarios(req, res as Response);
+    req.params = {
+      aulaId: "aula",
+      conteudoId: "conteudo",
+      exercicioId: "exercicio"
+    };
 
-    expect(res.status).toHaveBeenCalledWith(500);
+    req.query = {
+      usuarioId: "usuarioInvalido"
+    };
+
+    await dashboardExercicio(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  // =========================
-  // buscarUsuarioPorId
-  // =========================
-  test('deve retornar 404 se usuário não existir', async () => {
-    req.params.id = '123';
+  test("deve retornar 404 se aula não existir", async () => {
+    jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
 
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(null)
-    });
+    (Aula.findById as jest.Mock).mockResolvedValue(null);
 
-    await buscarUsuarioPorId(req, res as Response);
+    req.params = {
+      aulaId: "aula",
+      conteudoId: "conteudo",
+      exercicioId: "exercicio"
+    };
+
+    await dashboardExercicio(req, res as Response);
 
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve retornar usuário por id', async () => {
-    req.params.id = '123';
+  test("deve retornar 404 se conteúdo for inválido", async () => {
+    jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
 
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue({ _id: '123' })
-    });
-
-    await buscarUsuarioPorId(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  test('deve retornar 400 se id inválido', async () => {
-    req.params.id = 'invalid';
-
-    (Usuario.findById as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await buscarUsuarioPorId(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  // =========================
-  // criarUsuario
-  // =========================
-  test('deve retornar 400 se campos obrigatórios não enviados', async () => {
-    req.body = { nome: 'Lucas' };
-
-    await criarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  test('deve retornar 400 se senha fraca', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'fraca'
+    const aulaMock = {
+      conteudos: {
+        id: jest.fn().mockReturnValue(null)
+      }
     };
 
-    (validarSenhaForte as jest.Mock).mockReturnValue(false);
+    (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
 
-    await criarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  test('deve retornar 409 se email já existir', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'Senha@123'
+    req.params = {
+      aulaId: "aula",
+      conteudoId: "conteudo",
+      exercicioId: "exercicio"
     };
 
-    (validarSenhaForte as jest.Mock).mockReturnValue(true);
-    (Usuario.findOne as jest.Mock).mockResolvedValue({});
-
-    await criarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(409);
-  });
-
-  test('deve criar usuário com sucesso', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'Senha@123'
-    };
-
-    (validarSenhaForte as jest.Mock).mockReturnValue(true);
-    (Usuario.findOne as jest.Mock).mockResolvedValue(null);
-    (bcrypt.hash as jest.Mock).mockResolvedValue('hash');
-    (Usuario.create as jest.Mock).mockResolvedValue({
-      _id: '123',
-      nome: 'Lucas',
-      email: 'test@test.com',
-      role: 'ESTUDANTE',
-      status: 'APROVADO'
-    });
-
-    await criarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(201);
-  });
-
-  test('deve retornar 500 se ocorrer erro ao criar usuário', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'Senha@123'
-    };
-
-    (validarSenhaForte as jest.Mock).mockReturnValue(true);
-    (Usuario.findOne as jest.Mock).mockResolvedValue(null);
-    (bcrypt.hash as jest.Mock).mockResolvedValue('hash');
-    (Usuario.create as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await criarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(500);
-  });
-
-  // =========================
-  // atualizarUsuario
-  // =========================
-  test('deve retornar 404 se usuário não existir ao atualizar', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
-    await atualizarUsuario(req, res as Response);
+    await dashboardExercicio(req, res as Response);
 
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve atualizar usuário', async () => {
-    req.params.id = '123';
+  test("deve retornar 404 se exercício não existir", async () => {
+    jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
 
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({});
+    const conteudoMock = {
+      tipo: "exercicio",
+      exercicio: {
+        id: jest.fn().mockReturnValue(null)
+      }
+    };
 
-    await atualizarUsuario(req, res as Response);
+    const aulaMock = {
+      conteudos: {
+        id: jest.fn().mockReturnValue(conteudoMock)
+      }
+    };
 
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
+    (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
 
-  test('deve retornar 400 se ocorrer erro ao atualizar usuário', async () => {
-    req.params.id = '123';
+    req.params = {
+      aulaId: "aula",
+      conteudoId: "conteudo",
+      exercicioId: "exercicio"
+    };
 
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await atualizarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  // =========================
-  // deletarUsuario
-  // =========================
-  test('deve retornar 404 se usuário não existir ao deletar', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndDelete as jest.Mock).mockResolvedValue(null);
-
-    await deletarUsuario(req, res as Response);
+    await dashboardExercicio(req, res as Response);
 
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve deletar usuário e aulas', async () => {
-    req.params.id = '123';
+  test("deve retornar o dashboard corretamente", async () => {
+    jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
 
-    (Usuario.findByIdAndDelete as jest.Mock).mockResolvedValue({});
-    (Aula.deleteMany as jest.Mock).mockResolvedValue({});
+    const exercicioMock = {
+      respostas: [
+        {
+          correta: true,
+          tempoSegundos: 10,
+          usuario: { toString: () => "u1" },
+          dataResposta: new Date()
+        },
+        {
+          correta: false,
+          tempoSegundos: 20,
+          usuario: { toString: () => "u2" },
+          dataResposta: new Date()
+        },
+        {
+          correta: true,
+          tempoSegundos: 30,
+          usuario: { toString: () => "u1" },
+          dataResposta: new Date()
+        }
+      ]
+    };
 
-    await deletarUsuario(req, res as Response);
+    const conteudoMock = {
+      tipo: "exercicio",
+      exercicio: {
+        id: jest.fn().mockReturnValue(exercicioMock)
+      }
+    };
 
-    expect(Aula.deleteMany).toHaveBeenCalled();
+    const aulaMock = {
+      conteudos: {
+        id: jest.fn().mockReturnValue(conteudoMock)
+      }
+    };
+
+    (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
+
+    req.params = {
+      aulaId: "aula",
+      conteudoId: "conteudo",
+      exercicioId: "exercicio"
+    };
+
+    await dashboardExercicio(req, res as Response);
+
     expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  test('deve retornar 500 se ocorrer erro ao deletar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndDelete as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await deletarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(500);
-  });
-
-  // =========================
-  // aprovarUsuario
-  // =========================
-  test('deve retornar 404 se usuário não existir ao aprovar', async () => {
-    req.params.id = '123';
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(null)
-    });
-
-    await aprovarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve retornar 400 se usuário já estiver aprovado', async () => {
-    req.params.id = '123';
-
-    const usuarioMock: any = {
-      status: 'APROVADO',
-      email: 'test@test.com',
-      nome: 'Lucas'
-    };
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(usuarioMock)
-    });
-
-    await aprovarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  test('deve retornar 400 se usuário já possui token válido', async () => {
-    req.params.id = '123';
-
-    const usuarioMock: any = {
-      status: 'PENDENTE',
-      email: 'test@test.com',
-      nome: 'Lucas',
-      tokenAtivacaoSenha: 'token',
-      tokenAtivacaoExpira: new Date(Date.now() + 10000)
-    };
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(usuarioMock)
-    });
-
-    await aprovarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  test('deve aprovar usuário e enviar email', async () => {
-    req.params.id = '123';
-
-    const usuarioMock: any = {
-      status: 'PENDENTE',
-      email: 'test@test.com',
-      nome: 'Lucas',
-      save: jest.fn()
-    };
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(usuarioMock)
-    });
-
-    jest.spyOn(crypto, 'randomBytes').mockReturnValue(
-      Buffer.from('token') as any
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        totalTentativas: 3,
+        totalAcertos: 2,
+        totalErros: 1,
+        usuariosUnicos: 2
+      })
     );
-
-    await aprovarUsuario(req, res as Response);
-
-    expect(emailService.enviarAtivacaoSenha).toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test('deve retornar 500 se ocorrer erro ao aprovar usuário', async () => {
-    req.params.id = '123';
+  test("deve retornar 500 se ocorrer erro no dashboard", async () => {
+    jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
 
-    (Usuario.findById as jest.Mock).mockImplementation(() => {
+    (Aula.findById as jest.Mock).mockImplementation(() => {
       throw new Error();
     });
 
-    await aprovarUsuario(req, res as Response);
+    req.params = {
+      aulaId: "aula",
+      conteudoId: "conteudo",
+      exercicioId: "exercicio"
+    };
+
+    await dashboardExercicio(req, res as Response);
 
     expect(res.status).toHaveBeenCalledWith(500);
   });
 
-  // =========================
-  // reprovarUsuario
-  // =========================
-  test('deve retornar 404 se usuário não existir ao reprovar', async () => {
-    req.params.id = '123';
+  // ======================================================
+  // rankingExercicio
+  // ======================================================
 
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
+  test("deve retornar 400 se algum id for inválido no ranking", async () => {
+    jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(false);
 
-    await reprovarUsuario(req, res as Response);
+    req.params = {
+      aulaId: "aula",
+      conteudoId: "conteudo",
+      exercicioId: "exercicio"
+    };
 
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve reprovar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({
-      email: 'test@test.com',
-      nome: 'Lucas'
-    });
-
-    await reprovarUsuario(req, res as Response);
-
-    expect(emailService.reprovado).toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  test('deve retornar 400 se ocorrer erro ao reprovar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await reprovarUsuario(req, res as Response);
+    await rankingExercicio(req, res as Response);
 
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  // =========================
-  // promover / despromover admin
-  // =========================
-  test('deve retornar 404 se usuário não existir ao promover', async () => {
-    req.params.id = '123';
+  test("deve retornar 404 se aula não existir no ranking", async () => {
+    jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
 
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
+    (Aula.findById as jest.Mock).mockResolvedValue(null);
 
-    await promoverAdmin(req, res as Response);
+    req.params = {
+      aulaId: "aula",
+      conteudoId: "conteudo",
+      exercicioId: "exercicio"
+    };
 
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve promover usuário a admin', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({
-      email: 'test@test.com',
-      nome: 'Lucas'
-    });
-
-    await promoverAdmin(req, res as Response);
-
-    expect(emailService.promovidoAdmin).toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  test('deve retornar 400 se ocorrer erro ao promover usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await promoverAdmin(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  test('deve retornar 404 se usuário não existir ao despromover', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
-    await despromoverAdmin(req, res as Response);
+    await rankingExercicio(req, res as Response);
 
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve despromover admin', async () => {
-    req.params.id = '123';
+  test("deve retornar 404 se conteúdo não existir no ranking", async () => {
+    jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
 
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({
-      email: 'test@test.com',
-      nome: 'Lucas'
-    });
+    const aulaMock = {
+      conteudos: {
+        id: jest.fn().mockReturnValue(null)
+      }
+    };
 
-    await despromoverAdmin(req, res as Response);
+    (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
 
-    expect(emailService.despromovidoAdmin).toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
+    req.params = {
+      aulaId: "aula",
+      conteudoId: "conteudo",
+      exercicioId: "exercicio"
+    };
+
+    await rankingExercicio(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve retornar 400 se ocorrer erro ao despromover usuário', async () => {
-    req.params.id = '123';
+  test("deve retornar 404 se exercício não existir no ranking", async () => {
+  jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
 
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
+  const conteudoMock = {
+    tipo: "exercicio",
+    exercicio: {
+      id: jest.fn().mockReturnValue(null)
+    }
+  };
+
+  const aulaMock = {
+    conteudos: {
+      id: jest.fn().mockReturnValue(conteudoMock)
+    }
+  };
+
+  (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
+
+  req.params = {
+    aulaId: "aula",
+    conteudoId: "conteudo",
+    exercicioId: "exercicio"
+  };
+
+  await rankingExercicio(req, res as Response);
+
+  expect(res.status).toHaveBeenCalledWith(404);
+});
+
+  test("deve gerar ranking corretamente", async () => {
+  jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+
+  const exercicioMock = {
+    respostas: [
+      {
+        correta: true,
+        tempoSegundos: 10,
+        usuario: { toString: () => "u1" },
+        dataResposta: new Date()
+      },
+      {
+        correta: false,
+        tempoSegundos: 20,
+        usuario: { toString: () => "u1" },
+        dataResposta: new Date()
+      },
+      {
+        correta: true,
+        tempoSegundos: 5,
+        usuario: { toString: () => "u2" },
+        dataResposta: new Date()
+      }
+    ]
+  };
+
+  const exerciciosArray: any = [];
+  exerciciosArray.id = jest.fn().mockReturnValue(exercicioMock);
+
+  const conteudoMock = {
+    exercicio: exerciciosArray
+  };
+
+  const aulaMock = {
+    conteudos: {
+      id: jest.fn().mockReturnValue(conteudoMock)
+    }
+  };
+
+  (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
+
+  req.params = {
+    aulaId: "aula",
+    conteudoId: "conteudo",
+    exercicioId: "exercicio"
+  };
+
+  await rankingExercicio(req, res as Response);
+
+  expect(res.status).toHaveBeenCalledWith(200);
+  expect(res.json).toHaveBeenCalledWith(expect.any(Array));
+});
+
+  test("deve retornar 500 se ocorrer erro no ranking", async () => {
+    jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+
+    (Aula.findById as jest.Mock).mockImplementation(() => {
       throw new Error();
     });
 
-    await despromoverAdmin(req, res as Response);
+    req.params = {
+      aulaId: "aula",
+      conteudoId: "conteudo",
+      exercicioId: "exercicio"
+    };
 
-    expect(res.status).toHaveBeenCalledWith(400);
+    await rankingExercicio(req, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(500);
   });
+
 });

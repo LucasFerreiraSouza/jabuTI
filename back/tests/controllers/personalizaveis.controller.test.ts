@@ -1,462 +1,410 @@
-import { Request, Response } from 'express';
-import bcrypt from 'bcrypt';
-import crypto from 'crypto';
-
-import Usuario from '../../models/usuarios.model';
-import {Aula} from '../../models/aulas.model';
-import { emailService } from '../../utils/emailService';
-import { validarSenhaForte } from '../../utils/senha';
-
+/* ============================
+   TESTES DE ERROS E SUCESSO - 100% COVERAGE
+============================ */
+import { Request, Response } from "express";
+import mongoose from "mongoose";
 import {
-  listarUsuarios,
-  buscarUsuarioPorId,
-  criarUsuario,
-  atualizarUsuario,
-  deletarUsuario,
-  aprovarUsuario,
-  reprovarUsuario,
-  promoverAdmin,
-  despromoverAdmin
-} from '../../controllers/admin.controller';
+  alterarBackgroundAula,
+  alterarBackgroundConteudo,
+  alterarTextAula,
+  alterarTextConteudo,
+  alterarOrdemAula,
+  alterarOrdemConteudo,
+  alterarBackgroundSite,
+  alterarTextColorSite
+} from "../../controllers/personalizaveis.controller";
 
-jest.mock('../../models/usuarios.model');
-jest.mock('../../models/aulas.model');
-jest.mock('../../utils/emailService');
-jest.mock('../../utils/senha');
-jest.mock('bcrypt');
+import { Aula, SiteConfig } from "../../models/aulas.model";
 
-describe('admin.controller', () => {
-  let req: any;
-  let res: Partial<Response>;
+// Mock dos models
+jest.mock("../../models/aulas.model");
 
-  beforeEach(() => {
-    req = { body: {}, params: {} };
-    res = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn()
-    };
+// Helper para mockar Response
+function mockResponse(): Response {
+  const res: Partial<Response> = {};
+  res.status = jest.fn().mockReturnThis();
+  res.json = jest.fn().mockReturnThis();
+  return res as Response;
+}
+
+describe("Controllers de cores, textos e ordem - 100% coverage", () => {
+  beforeAll(() => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
   });
 
-  afterEach(() => {
+  afterAll(() => {
+    jest.restoreAllMocks();
+  });
+
+  beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  // =========================
-  // listarUsuarios
-  // =========================
-  test('deve listar usuários', async () => {
-    (Usuario.find as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue([])
-    });
+  const invalidId = "123";
+  const validId = () => new mongoose.Types.ObjectId().toString();
 
-    await listarUsuarios(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(200);
+  /* -----------------------
+     alterarBackgroundAula
+  ----------------------- */
+  it("400 se aulaId inválido", async () => {
+    const req = { params: { aulaId: invalidId }, body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarBackgroundAula(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  test('deve retornar 500 em caso de erro ao listar usuários', async () => {
-    (Usuario.find as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
+  it("400 se cor não fornecida", async () => {
+    const req = { params: { aulaId: validId() }, body: {} } as unknown as Request;
+    const res = mockResponse();
+    await alterarBackgroundAula(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
 
-    await listarUsuarios(req, res as Response);
+  it("404 se aula não encontrada", async () => {
+    (Aula.findById as any).mockResolvedValue(null);
+    const req = { params: { aulaId: validId() }, body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarBackgroundAula(req, res);
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
 
+  it("500 se Aula.findById lançar erro", async () => {
+    (Aula.findById as any).mockRejectedValue(new Error("Erro inesperado"));
+    const req = { params: { aulaId: validId() }, body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarBackgroundAula(req, res);
     expect(res.status).toHaveBeenCalledWith(500);
   });
 
-  // =========================
-  // buscarUsuarioPorId
-  // =========================
-  test('deve retornar 404 se usuário não existir', async () => {
-    req.params.id = '123';
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(null)
-    });
-
-    await buscarUsuarioPorId(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve retornar usuário por id', async () => {
-    req.params.id = '123';
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue({ _id: '123' })
-    });
-
-    await buscarUsuarioPorId(req, res as Response);
-
+  it("200 altera background corretamente", async () => {
+    const aulaMock: any = { backgroundColor: "#000", save: jest.fn().mockResolvedValue(true) };
+    (Aula.findById as any).mockResolvedValue(aulaMock);
+    const req = { params: { aulaId: validId() }, body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarBackgroundAula(req, res);
+    expect(aulaMock.backgroundColor).toBe("#fff");
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test('deve retornar 400 se id inválido', async () => {
-    req.params.id = 'invalid';
-
-    (Usuario.findById as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await buscarUsuarioPorId(req, res as Response);
-
+  /* -----------------------
+     alterarTextAula
+  ----------------------- */
+  it("400 se text não fornecido", async () => {
+    const req = { params: { aulaId: validId() }, body: {} } as unknown as Request;
+    const res = mockResponse();
+    await alterarTextAula(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  // =========================
-  // criarUsuario
-  // =========================
-  test('deve retornar 400 se campos obrigatórios não enviados', async () => {
-    req.body = { nome: 'Lucas' };
-
-    await criarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
+  it("404 se aula não encontrada para text", async () => {
+    (Aula.findById as any).mockResolvedValue(null);
+    const req = { params: { aulaId: validId() }, body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarTextAula(req, res);
+    expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve retornar 400 se senha fraca', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'fraca'
-    };
-
-    (validarSenhaForte as jest.Mock).mockReturnValue(false);
-
-    await criarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  test('deve retornar 409 se email já existir', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'Senha@123'
-    };
-
-    (validarSenhaForte as jest.Mock).mockReturnValue(true);
-    (Usuario.findOne as jest.Mock).mockResolvedValue({});
-
-    await criarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(409);
-  });
-
-  test('deve criar usuário com sucesso', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'Senha@123'
-    };
-
-    (validarSenhaForte as jest.Mock).mockReturnValue(true);
-    (Usuario.findOne as jest.Mock).mockResolvedValue(null);
-    (bcrypt.hash as jest.Mock).mockResolvedValue('hash');
-    (Usuario.create as jest.Mock).mockResolvedValue({
-      _id: '123',
-      nome: 'Lucas',
-      email: 'test@test.com',
-      role: 'ESTUDANTE',
-      status: 'APROVADO'
-    });
-
-    await criarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(201);
-  });
-
-  test('deve retornar 500 se ocorrer erro ao criar usuário', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'Senha@123'
-    };
-
-    (validarSenhaForte as jest.Mock).mockReturnValue(true);
-    (Usuario.findOne as jest.Mock).mockResolvedValue(null);
-    (bcrypt.hash as jest.Mock).mockResolvedValue('hash');
-    (Usuario.create as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await criarUsuario(req, res as Response);
-
+  it("500 se Aula.findById lançar erro para text", async () => {
+    (Aula.findById as any).mockRejectedValue(new Error("Erro inesperado"));
+    const req = { params: { aulaId: validId() }, body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarTextAula(req, res);
     expect(res.status).toHaveBeenCalledWith(500);
   });
 
-  // =========================
-  // atualizarUsuario
-  // =========================
-  test('deve retornar 404 se usuário não existir ao atualizar', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
-    await atualizarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve atualizar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({});
-
-    await atualizarUsuario(req, res as Response);
-
+  it("200 altera text corretamente", async () => {
+    const aulaMock: any = { textColor: "#000", save: jest.fn().mockResolvedValue(true) };
+    (Aula.findById as any).mockResolvedValue(aulaMock);
+    const req = { params: { aulaId: validId() }, body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarTextAula(req, res);
+    expect(aulaMock.textColor).toBe("#fff");
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test('deve retornar 400 se ocorrer erro ao atualizar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await atualizarUsuario(req, res as Response);
-
+  /* -----------------------
+     alterarBackgroundConteudo
+  ----------------------- */
+  it("400 se IDs inválidos", async () => {
+    const req = { params: { aulaId: invalidId, conteudoId: invalidId }, body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarBackgroundConteudo(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  // =========================
-  // deletarUsuario
-  // =========================
-  test('deve retornar 404 se usuário não existir ao deletar', async () => {
-    req.params.id = '123';
+  it("400 se cor não fornecida no conteúdo", async () => {
+    const req = { params: { aulaId: validId(), conteudoId: validId() }, body: {} } as unknown as Request;
+    const res = mockResponse();
+    await alterarBackgroundConteudo(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
 
-    (Usuario.findByIdAndDelete as jest.Mock).mockResolvedValue(null);
-
-    await deletarUsuario(req, res as Response);
-
+  it("404 se aula não encontrada no conteúdo", async () => {
+    (Aula.findById as any).mockResolvedValue(null);
+    const req = { params: { aulaId: validId(), conteudoId: validId() }, body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarBackgroundConteudo(req, res);
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve deletar usuário e aulas', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndDelete as jest.Mock).mockResolvedValue({});
-    (Aula.deleteMany as jest.Mock).mockResolvedValue({});
-
-    await deletarUsuario(req, res as Response);
-
-    expect(Aula.deleteMany).toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
+  it("404 se conteúdo não encontrado", async () => {
+    const aulaMock: any = { conteudos: { id: jest.fn().mockReturnValue(null) }, save: jest.fn() };
+    (Aula.findById as any).mockResolvedValue(aulaMock);
+    const req = { params: { aulaId: validId(), conteudoId: validId() }, body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarBackgroundConteudo(req, res);
+    expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve retornar 500 se ocorrer erro ao deletar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndDelete as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await deletarUsuario(req, res as Response);
-
+  it("500 se Aula.findById lançar erro para conteúdo", async () => {
+    (Aula.findById as any).mockRejectedValue(new Error("Erro inesperado"));
+    const req = { params: { aulaId: validId(), conteudoId: validId() }, body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarBackgroundConteudo(req, res);
     expect(res.status).toHaveBeenCalledWith(500);
   });
 
-  // =========================
-  // aprovarUsuario
-  // =========================
-  test('deve retornar 404 se usuário não existir ao aprovar', async () => {
-    req.params.id = '123';
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(null)
-    });
-
-    await aprovarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve retornar 400 se usuário já estiver aprovado', async () => {
-    req.params.id = '123';
-
-    const usuarioMock: any = {
-      status: 'APROVADO',
-      email: 'test@test.com',
-      nome: 'Lucas'
-    };
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(usuarioMock)
-    });
-
-    await aprovarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  test('deve retornar 400 se usuário já possui token válido', async () => {
-    req.params.id = '123';
-
-    const usuarioMock: any = {
-      status: 'PENDENTE',
-      email: 'test@test.com',
-      nome: 'Lucas',
-      tokenAtivacaoSenha: 'token',
-      tokenAtivacaoExpira: new Date(Date.now() + 10000)
-    };
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(usuarioMock)
-    });
-
-    await aprovarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  test('deve aprovar usuário e enviar email', async () => {
-    req.params.id = '123';
-
-    const usuarioMock: any = {
-      status: 'PENDENTE',
-      email: 'test@test.com',
-      nome: 'Lucas',
-      save: jest.fn()
-    };
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(usuarioMock)
-    });
-
-    jest.spyOn(crypto, 'randomBytes').mockReturnValue(
-      Buffer.from('token') as any
-    );
-
-    await aprovarUsuario(req, res as Response);
-
-    expect(emailService.enviarAtivacaoSenha).toHaveBeenCalled();
+  it("200 altera background do conteúdo corretamente", async () => {
+    const conteudoMock: any = { backgroundColor: "#000" };
+    const aulaMock: any = { conteudos: { id: jest.fn().mockReturnValue(conteudoMock) }, save: jest.fn().mockResolvedValue(true) };
+    (Aula.findById as any).mockResolvedValue(aulaMock);
+    const req = { params: { aulaId: validId(), conteudoId: validId() }, body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarBackgroundConteudo(req, res);
+    expect(conteudoMock.backgroundColor).toBe("#fff");
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test('deve retornar 500 se ocorrer erro ao aprovar usuário', async () => {
-    req.params.id = '123';
+  /* -----------------------
+     alterarTextConteudo
+  ----------------------- */
+  it("400 se IDs inválidos no text do conteúdo", async () => {
+    const req = { params: { aulaId: invalidId, conteudoId: invalidId }, body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarTextConteudo(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
 
-    (Usuario.findById as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
+  it("400 se cor não fornecida no text do conteúdo", async () => {
+    const req = { params: { aulaId: validId(), conteudoId: validId() }, body: {} } as unknown as Request;
+    const res = mockResponse();
+    await alterarTextConteudo(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
 
-    await aprovarUsuario(req, res as Response);
+  it("404 se aula não encontrada no text do conteúdo", async () => {
+    (Aula.findById as any).mockResolvedValue(null);
+    const req = { params: { aulaId: validId(), conteudoId: validId() }, body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarTextConteudo(req, res);
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
 
+  it("404 se conteúdo não encontrado no text do conteúdo", async () => {
+    const aulaMock: any = { conteudos: { id: jest.fn().mockReturnValue(null) }, save: jest.fn() };
+    (Aula.findById as any).mockResolvedValue(aulaMock);
+    const req = { params: { aulaId: validId(), conteudoId: validId() }, body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarTextConteudo(req, res);
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  it("500 se Aula.findById lançar erro no text do conteúdo", async () => {
+    (Aula.findById as any).mockRejectedValue(new Error("Erro inesperado"));
+    const req = { params: { aulaId: validId(), conteudoId: validId() }, body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarTextConteudo(req, res);
     expect(res.status).toHaveBeenCalledWith(500);
   });
 
-  // =========================
-  // reprovarUsuario
-  // =========================
-  test('deve retornar 404 se usuário não existir ao reprovar', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
-    await reprovarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve reprovar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({
-      email: 'test@test.com',
-      nome: 'Lucas'
-    });
-
-    await reprovarUsuario(req, res as Response);
-
-    expect(emailService.reprovado).toHaveBeenCalled();
+  it("200 altera text do conteúdo corretamente", async () => {
+    const conteudoMock: any = { textColor: "#000" };
+    const aulaMock: any = { conteudos: { id: jest.fn().mockReturnValue(conteudoMock) }, save: jest.fn().mockResolvedValue(true) };
+    (Aula.findById as any).mockResolvedValue(aulaMock);
+    const req = { params: { aulaId: validId(), conteudoId: validId() }, body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarTextConteudo(req, res);
+    expect(conteudoMock.textColor).toBe("#fff");
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test('deve retornar 400 se ocorrer erro ao reprovar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await reprovarUsuario(req, res as Response);
-
+  /* -----------------------
+     alterarOrdemAula
+  ----------------------- */
+  it("400 se ordem inválida", async () => {
+    const req = { params: { aulaId: validId() }, body: { ordem: "abc" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarOrdemAula(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  // =========================
-  // promover / despromover admin
-  // =========================
-  test('deve retornar 404 se usuário não existir ao promover', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
-    await promoverAdmin(req, res as Response);
-
+  it("404 se aula não encontrada para ordem", async () => {
+    (Aula.findById as any).mockResolvedValue(null);
+    const req = { params: { aulaId: validId() }, body: { ordem: 1 } } as unknown as Request;
+    const res = mockResponse();
+    await alterarOrdemAula(req, res);
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve promover usuário a admin', async () => {
-    req.params.id = '123';
+  it("500 se Aula.findById lançar erro na ordem da aula", async () => {
+    (Aula.findById as any).mockRejectedValue(new Error("Erro inesperado"));
+    const req = { params: { aulaId: validId() }, body: { ordem: 1 } } as unknown as Request;
+    const res = mockResponse();
+    await alterarOrdemAula(req, res);
+    expect(res.status).toHaveBeenCalledWith(500);
+  });
 
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({
-      email: 'test@test.com',
-      nome: 'Lucas'
-    });
-
-    await promoverAdmin(req, res as Response);
-
-    expect(emailService.promovidoAdmin).toHaveBeenCalled();
+  it("200 altera ordem corretamente", async () => {
+    const aulaMock: any = { ordem: 0, save: jest.fn().mockResolvedValue(true) };
+    (Aula.findById as any).mockResolvedValue(aulaMock);
+    const req = { params: { aulaId: validId() }, body: { ordem: 2 } } as unknown as Request;
+    const res = mockResponse();
+    await alterarOrdemAula(req, res);
+    expect(aulaMock.ordem).toBe(2);
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test('deve retornar 400 se ocorrer erro ao promover usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await promoverAdmin(req, res as Response);
-
+  /* -----------------------
+     alterarOrdemConteudo
+  ----------------------- */
+  it("400 se IDs inválidos na ordem do conteúdo", async () => {
+    const req = { params: { aulaId: invalidId, conteudoId: invalidId }, body: { ordem: 1 } } as unknown as Request;
+    const res = mockResponse();
+    await alterarOrdemConteudo(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  test('deve retornar 404 se usuário não existir ao despromover', async () => {
-    req.params.id = '123';
+  it("400 se ordem inválida no conteúdo", async () => {
+    const req = { params: { aulaId: validId(), conteudoId: validId() }, body: { ordem: "abc" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarOrdemConteudo(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
 
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
-    await despromoverAdmin(req, res as Response);
-
+  it("404 se aula não encontrada no conteúdo", async () => {
+    (Aula.findById as any).mockResolvedValue(null);
+    const req = { params: { aulaId: validId(), conteudoId: validId() }, body: { ordem: 1 } } as unknown as Request;
+    const res = mockResponse();
+    await alterarOrdemConteudo(req, res);
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  test('deve despromover admin', async () => {
-    req.params.id = '123';
+  it("404 se conteúdo não encontrado na ordem", async () => {
+    const aulaMock: any = { conteudos: { id: jest.fn().mockReturnValue(null) }, save: jest.fn() };
+    (Aula.findById as any).mockResolvedValue(aulaMock);
+    const req = { params: { aulaId: validId(), conteudoId: validId() }, body: { ordem: 1 } } as unknown as Request;
+    const res = mockResponse();
+    await alterarOrdemConteudo(req, res);
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
 
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({
-      email: 'test@test.com',
-      nome: 'Lucas'
-    });
+  it("500 se Aula.findById lançar erro na ordem do conteúdo", async () => {
+    (Aula.findById as any).mockRejectedValue(new Error("Erro inesperado"));
+    const req = { params: { aulaId: validId(), conteudoId: validId() }, body: { ordem: 1 } } as unknown as Request;
+    const res = mockResponse();
+    await alterarOrdemConteudo(req, res);
+    expect(res.status).toHaveBeenCalledWith(500);
+  });
 
-    await despromoverAdmin(req, res as Response);
-
-    expect(emailService.despromovidoAdmin).toHaveBeenCalled();
+  it("200 altera ordem do conteúdo corretamente", async () => {
+    const conteudoMock: any = { ordem: 0 };
+    const aulaMock: any = { conteudos: { id: jest.fn().mockReturnValue(conteudoMock) }, save: jest.fn().mockResolvedValue(true) };
+    (Aula.findById as any).mockResolvedValue(aulaMock);
+    const req = { params: { aulaId: validId(), conteudoId: validId() }, body: { ordem: 3 } } as unknown as Request;
+    const res = mockResponse();
+    await alterarOrdemConteudo(req, res);
+    expect(conteudoMock.ordem).toBe(3);
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test('deve retornar 400 se ocorrer erro ao despromover usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
-    });
-
-    await despromoverAdmin(req, res as Response);
-
+  /* -----------------------
+     alterarBackgroundSite
+  ----------------------- */
+  it("400 se cor não fornecida para site", async () => {
+    const req = { body: {} } as unknown as Request;
+    const res = mockResponse();
+    await alterarBackgroundSite(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
   });
+
+  it("500 se SiteConfig.findOne lançar erro", async () => {
+    (SiteConfig.findOne as any).mockRejectedValue(new Error("Erro inesperado"));
+    const req = { body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarBackgroundSite(req, res);
+    expect(res.status).toHaveBeenCalledWith(500);
+  });
+
+  it("200 altera background site existente", async () => {
+    const configMock: any = { backgroundColorSite: "#000", save: jest.fn().mockResolvedValue(true) };
+    (SiteConfig.findOne as any).mockResolvedValue(configMock);
+    const req = { body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarBackgroundSite(req, res);
+    expect(configMock.backgroundColorSite).toBe("#fff");
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("200 cria nova config ao alterar background site se não existir", async () => {
+    (SiteConfig.findOne as any).mockResolvedValue(null);
+    const saveMock = jest.fn().mockResolvedValue(true);
+    const constructorMock = jest.fn().mockImplementation(() => ({ save: saveMock }));
+    (SiteConfig as any).mockImplementation(constructorMock);
+
+    const req = { body: { cor: "#123456" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarBackgroundSite(req, res);
+    expect(constructorMock).toHaveBeenCalledWith({
+      backgroundColorSite: "#123456",
+      textColorSite: "#000000"
+    });
+    expect(saveMock).toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  /* -----------------------
+     alterarTextColorSite
+  ----------------------- */
+  it("400 se cor não fornecida para text site", async () => {
+    const req = { body: {} } as unknown as Request;
+    const res = mockResponse();
+    await alterarTextColorSite(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it("500 se SiteConfig.findOne lançar erro no text site", async () => {
+    (SiteConfig.findOne as any).mockRejectedValue(new Error("Erro inesperado"));
+    const req = { body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarTextColorSite(req, res);
+    expect(res.status).toHaveBeenCalledWith(500);
+  });
+
+  it("200 altera text color site existente", async () => {
+    const configMock: any = { textColorSite: "#000", save: jest.fn().mockResolvedValue(true) };
+    (SiteConfig.findOne as any).mockResolvedValue(configMock);
+    const req = { body: { cor: "#fff" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarTextColorSite(req, res);
+    expect(configMock.textColorSite).toBe("#fff");
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("200 cria nova config ao alterar text site se não existir", async () => {
+    (SiteConfig.findOne as any).mockResolvedValue(null);
+    const saveMock = jest.fn().mockResolvedValue(true);
+    const constructorMock = jest.fn().mockImplementation(() => ({ save: saveMock }));
+    (SiteConfig as any).mockImplementation(constructorMock);
+
+    const req = { body: { cor: "#123456" } } as unknown as Request;
+    const res = mockResponse();
+    await alterarTextColorSite(req, res);
+    expect(constructorMock).toHaveBeenCalledWith({
+      backgroundColorSite: "#f0f0f0",
+      textColorSite: "#123456"
+    });
+    expect(saveMock).toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
 });

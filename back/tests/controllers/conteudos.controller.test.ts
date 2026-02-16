@@ -1,462 +1,282 @@
-import { Request, Response } from 'express';
-import bcrypt from 'bcrypt';
-import crypto from 'crypto';
-
-import Usuario from '../../models/usuarios.model';
-import {Aula} from '../../models/aulas.model';
-import { emailService } from '../../utils/emailService';
-import { validarSenhaForte } from '../../utils/senha';
-
+import { Request, Response } from "express";
+import mongoose from "mongoose";
 import {
-  listarUsuarios,
-  buscarUsuarioPorId,
-  criarUsuario,
-  atualizarUsuario,
-  deletarUsuario,
-  aprovarUsuario,
-  reprovarUsuario,
-  promoverAdmin,
-  despromoverAdmin
-} from '../../controllers/admin.controller';
+  listarConteudos,
+  adicionarConteudo,
+  atualizarConteudo,
+  deletarConteudo,
+} from "../../controllers/conteudos.controller";
+import { Aula } from "../../models/aulas.model";
 
-jest.mock('../../models/usuarios.model');
-jest.mock('../../models/aulas.model');
-jest.mock('../../utils/emailService');
-jest.mock('../../utils/senha');
-jest.mock('bcrypt');
+jest.mock("../../models/aulas.model");
 
-describe('admin.controller', () => {
-  let req: any;
+describe("conteudos.controller", () => {
+  let req: Partial<Request>;
   let res: Partial<Response>;
 
+  let json: jest.Mock;
+  let status: jest.Mock;
+
   beforeEach(() => {
-    req = { body: {}, params: {} };
-    res = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn()
-    };
-  });
-
-  afterEach(() => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
     jest.clearAllMocks();
+
+    json = jest.fn();
+    status = jest.fn().mockReturnValue({ json });
+
+    req = { params: {}, body: {} };
+    res = { status: status as any };
   });
 
-  // =========================
-  // listarUsuarios
-  // =========================
-  test('deve listar usuários', async () => {
-    (Usuario.find as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue([])
+  /* ============================
+     LISTAR CONTEÚDOS
+  ============================ */
+  describe("listarConteudos", () => {
+    it("retorna 400 se aulaId inválido", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(false);
+      req.params = { aulaId: "x" };
+      await listarConteudos(req as Request, res as Response);
+      expect(status).toHaveBeenCalledWith(400);
+      expect(json).toHaveBeenCalledWith({ erro: "ID inválido" });
     });
 
-    await listarUsuarios(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  test('deve retornar 500 em caso de erro ao listar usuários', async () => {
-    (Usuario.find as jest.Mock).mockImplementation(() => {
-      throw new Error();
+    it("retorna 404 se aula não existir", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      (Aula.findById as jest.Mock).mockResolvedValue(null);
+      req.params = { aulaId: "507f1f77bcf86cd799439011" };
+      await listarConteudos(req as Request, res as Response);
+      expect(status).toHaveBeenCalledWith(404);
+      expect(json).toHaveBeenCalledWith({ erro: "Aula não encontrada" });
     });
 
-    await listarUsuarios(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(500);
-  });
-
-  // =========================
-  // buscarUsuarioPorId
-  // =========================
-  test('deve retornar 404 se usuário não existir', async () => {
-    req.params.id = '123';
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(null)
+    it("lista conteúdos corretamente", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      const aulaMock = { conteudos: [{ titulo: "A" }] };
+      (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
+      req.params = { aulaId: "507f1f77bcf86cd799439011" };
+      await listarConteudos(req as Request, res as Response);
+      expect(status).toHaveBeenCalledWith(200);
+      expect(json).toHaveBeenCalledWith(aulaMock.conteudos);
     });
 
-    await buscarUsuarioPorId(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve retornar usuário por id', async () => {
-    req.params.id = '123';
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue({ _id: '123' })
+    it("retorna 500 se ocorrer erro", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      (Aula.findById as jest.Mock).mockRejectedValue(new Error());
+      req.params = { aulaId: "507f1f77bcf86cd799439011" };
+      await listarConteudos(req as Request, res as Response);
+      expect(status).toHaveBeenCalledWith(500);
+      expect(json).toHaveBeenCalledWith({ erro: "Erro ao listar conteúdos" });
     });
 
-    await buscarUsuarioPorId(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(200);
+    it("aceita aulaId como array", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      (Aula.findById as jest.Mock).mockResolvedValue({ conteudos: [] });
+      req.params = { aulaId: ["507f1f77bcf86cd799439011"] };
+      await listarConteudos(req as Request, res as Response);
+      expect(status).toHaveBeenCalledWith(200);
+    });
   });
 
-  test('deve retornar 400 se id inválido', async () => {
-    req.params.id = 'invalid';
-
-    (Usuario.findById as jest.Mock).mockImplementation(() => {
-      throw new Error();
+  /* ============================
+     ADICIONAR CONTEÚDO
+  ============================ */
+  describe("adicionarConteudo", () => {
+    it("retorna 400 se aulaId inválido", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(false);
+      req.params = { aulaId: "x" };
+      await adicionarConteudo(req as Request, res as Response);
+      expect(status).toHaveBeenCalledWith(400);
     });
 
-    await buscarUsuarioPorId(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  // =========================
-  // criarUsuario
-  // =========================
-  test('deve retornar 400 se campos obrigatórios não enviados', async () => {
-    req.body = { nome: 'Lucas' };
-
-    await criarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  test('deve retornar 400 se senha fraca', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'fraca'
-    };
-
-    (validarSenhaForte as jest.Mock).mockReturnValue(false);
-
-    await criarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  test('deve retornar 409 se email já existir', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'Senha@123'
-    };
-
-    (validarSenhaForte as jest.Mock).mockReturnValue(true);
-    (Usuario.findOne as jest.Mock).mockResolvedValue({});
-
-    await criarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(409);
-  });
-
-  test('deve criar usuário com sucesso', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'Senha@123'
-    };
-
-    (validarSenhaForte as jest.Mock).mockReturnValue(true);
-    (Usuario.findOne as jest.Mock).mockResolvedValue(null);
-    (bcrypt.hash as jest.Mock).mockResolvedValue('hash');
-    (Usuario.create as jest.Mock).mockResolvedValue({
-      _id: '123',
-      nome: 'Lucas',
-      email: 'test@test.com',
-      role: 'ESTUDANTE',
-      status: 'APROVADO'
+    it("retorna 404 se aula não existir", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      (Aula.findById as jest.Mock).mockResolvedValue(null);
+      req.params = { aulaId: "507f1f77bcf86cd799439011" };
+      await adicionarConteudo(req as Request, res as Response);
+      expect(status).toHaveBeenCalledWith(404);
     });
 
-    await criarUsuario(req, res as Response);
+    it("adiciona conteúdo corretamente com cores válidas", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      const aulaMock: any = { conteudos: [], save: jest.fn() };
+      (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
 
-    expect(res.status).toHaveBeenCalledWith(201);
-  });
+      req.params = { aulaId: "507f1f77bcf86cd799439011" };
+      req.body = { titulo: "Teste", backgroundColor: "#ff0000", textColor: "#000000", exercicio: [] };
+      (req as any).user = { id: "user1", username: "lucas" };
 
-  test('deve retornar 500 se ocorrer erro ao criar usuário', async () => {
-    req.body = {
-      nome: 'Lucas',
-      email: 'test@test.com',
-      senha: 'Senha@123'
-    };
+      await adicionarConteudo(req as Request, res as Response);
 
-    (validarSenhaForte as jest.Mock).mockReturnValue(true);
-    (Usuario.findOne as jest.Mock).mockResolvedValue(null);
-    (bcrypt.hash as jest.Mock).mockResolvedValue('hash');
-    (Usuario.create as jest.Mock).mockImplementation(() => {
-      throw new Error();
+      expect(aulaMock.conteudos.length).toBe(1);
+      expect(aulaMock.save).toHaveBeenCalled();
+      expect(status).toHaveBeenCalledWith(201);
     });
 
-    await criarUsuario(req, res as Response);
+    it("usa cores padrão quando inválidas", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      const aulaMock: any = { conteudos: [], save: jest.fn() };
+      (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
 
-    expect(res.status).toHaveBeenCalledWith(500);
-  });
+      req.params = { aulaId: "507f1f77bcf86cd799439011" };
+      req.body = { backgroundColor: "inv", textColor: "inv" };
 
-  // =========================
-  // atualizarUsuario
-  // =========================
-  test('deve retornar 404 se usuário não existir ao atualizar', async () => {
-    req.params.id = '123';
+      await adicionarConteudo(req as Request, res as Response);
 
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
-    await atualizarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve atualizar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({});
-
-    await atualizarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  test('deve retornar 400 se ocorrer erro ao atualizar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
+      const conteudo = aulaMock.conteudos[0];
+      expect(conteudo.backgroundColor).toBe("#ffffff");
+      expect(conteudo.textColor).toBe("#000000");
     });
 
-    await atualizarUsuario(req, res as Response);
+    it("fallback criadoPorUsername vazio", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      const aulaMock: any = { conteudos: [], save: jest.fn() };
+      (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
 
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
+      req.params = { aulaId: "507f1f77bcf86cd799439011" };
+      req.body = { titulo: "Teste" };
+      (req as any).user = { id: "user1" }; // sem username
 
-  // =========================
-  // deletarUsuario
-  // =========================
-  test('deve retornar 404 se usuário não existir ao deletar', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndDelete as jest.Mock).mockResolvedValue(null);
-
-    await deletarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve deletar usuário e aulas', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndDelete as jest.Mock).mockResolvedValue({});
-    (Aula.deleteMany as jest.Mock).mockResolvedValue({});
-
-    await deletarUsuario(req, res as Response);
-
-    expect(Aula.deleteMany).toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  test('deve retornar 500 se ocorrer erro ao deletar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndDelete as jest.Mock).mockImplementation(() => {
-      throw new Error();
+      await adicionarConteudo(req as Request, res as Response);
+      expect(aulaMock.conteudos[0].criadoPorUsername).toBe("");
     });
 
-    await deletarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(500);
+    it("retorna 500 se ocorrer erro", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      (Aula.findById as jest.Mock).mockRejectedValue(new Error());
+      req.params = { aulaId: "507f1f77bcf86cd799439011" };
+      await adicionarConteudo(req as Request, res as Response);
+      expect(status).toHaveBeenCalledWith(500);
+      expect(json).toHaveBeenCalledWith({ erro: "Erro ao adicionar conteúdo" });
+    });
   });
 
-  // =========================
-  // aprovarUsuario
-  // =========================
-  test('deve retornar 404 se usuário não existir ao aprovar', async () => {
-    req.params.id = '123';
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(null)
+  /* ============================
+     ATUALIZAR CONTEÚDO
+  ============================ */
+  describe("atualizarConteudo", () => {
+    it("retorna 400 se algum id inválido", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(false);
+      req.params = { aulaId: "x", conteudoId: "y" };
+      await atualizarConteudo(req as Request, res as Response);
+      expect(status).toHaveBeenCalledWith(400);
     });
 
-    await aprovarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve retornar 400 se usuário já estiver aprovado', async () => {
-    req.params.id = '123';
-
-    const usuarioMock: any = {
-      status: 'APROVADO',
-      email: 'test@test.com',
-      nome: 'Lucas'
-    };
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(usuarioMock)
+    it("retorna 404 se aula não existir", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      (Aula.findById as jest.Mock).mockResolvedValue(null);
+      req.params = { aulaId: "507f1f77bcf86cd799439011", conteudoId: "507f1f77bcf86cd799439012" };
+      await atualizarConteudo(req as Request, res as Response);
+      expect(status).toHaveBeenCalledWith(404);
     });
 
-    await aprovarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  test('deve retornar 400 se usuário já possui token válido', async () => {
-    req.params.id = '123';
-
-    const usuarioMock: any = {
-      status: 'PENDENTE',
-      email: 'test@test.com',
-      nome: 'Lucas',
-      tokenAtivacaoSenha: 'token',
-      tokenAtivacaoExpira: new Date(Date.now() + 10000)
-    };
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(usuarioMock)
+    it("retorna 404 se conteúdo não existir", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      const aulaMock: any = { conteudos: { id: jest.fn().mockReturnValue(null) } };
+      (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
+      req.params = { aulaId: "507f1f77bcf86cd799439011", conteudoId: "507f1f77bcf86cd799439012" };
+      await atualizarConteudo(req as Request, res as Response);
+      expect(status).toHaveBeenCalledWith(404);
     });
 
-    await aprovarUsuario(req, res as Response);
+    it("atualiza conteúdo corretamente", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      const conteudoMock: any = { titulo: "old", backgroundColor: "#fff" };
+      const aulaMock: any = { conteudos: { id: jest.fn().mockReturnValue(conteudoMock) }, save: jest.fn() };
+      (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
 
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
+      req.params = { aulaId: "507f1f77bcf86cd799439011", conteudoId: "507f1f77bcf86cd799439012" };
+      req.body = { titulo: "novo", backgroundColor: "#ff0000" };
 
-  test('deve aprovar usuário e enviar email', async () => {
-    req.params.id = '123';
+      await atualizarConteudo(req as Request, res as Response);
 
-    const usuarioMock: any = {
-      status: 'PENDENTE',
-      email: 'test@test.com',
-      nome: 'Lucas',
-      save: jest.fn()
-    };
-
-    (Usuario.findById as jest.Mock).mockReturnValue({
-      select: jest.fn().mockResolvedValue(usuarioMock)
+      expect(conteudoMock.titulo).toBe("novo");
+      expect(conteudoMock.backgroundColor).toBe("#ff0000");
+      expect(aulaMock.save).toHaveBeenCalled();
+      expect(status).toHaveBeenCalledWith(200);
     });
 
-    jest.spyOn(crypto, 'randomBytes').mockReturnValue(
-      Buffer.from('token') as any
-    );
+    it("conteudoId como array", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      const conteudoMock: any = { titulo: "old" };
+      const aulaMock: any = { conteudos: { id: jest.fn().mockReturnValue(conteudoMock) }, save: jest.fn() };
+      (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
 
-    await aprovarUsuario(req, res as Response);
+      req.params = { aulaId: ["507f1f77bcf86cd799439011"], conteudoId: ["507f1f77bcf86cd799439012"] };
+      req.body = { titulo: "novo" };
 
-    expect(emailService.enviarAtivacaoSenha).toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  test('deve retornar 500 se ocorrer erro ao aprovar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findById as jest.Mock).mockImplementation(() => {
-      throw new Error();
+      await atualizarConteudo(req as Request, res as Response);
+      expect(conteudoMock.titulo).toBe("novo");
+      expect(status).toHaveBeenCalledWith(200);
     });
 
-    await aprovarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(500);
+    it("retorna 500 se ocorrer erro", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      (Aula.findById as jest.Mock).mockRejectedValue(new Error());
+      req.params = { aulaId: "507f1f77bcf86cd799439011", conteudoId: "507f1f77bcf86cd799439012" };
+      await atualizarConteudo(req as Request, res as Response);
+      expect(status).toHaveBeenCalledWith(500);
+    });
   });
 
-  // =========================
-  // reprovarUsuario
-  // =========================
-  test('deve retornar 404 se usuário não existir ao reprovar', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
-    await reprovarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve reprovar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({
-      email: 'test@test.com',
-      nome: 'Lucas'
+  /* ============================
+     DELETAR CONTEÚDO
+  ============================ */
+  describe("deletarConteudo", () => {
+    it("retorna 400 se algum id inválido", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(false);
+      req.params = { aulaId: "x", conteudoId: "y" };
+      await deletarConteudo(req as Request, res as Response);
+      expect(status).toHaveBeenCalledWith(400);
     });
 
-    await reprovarUsuario(req, res as Response);
-
-    expect(emailService.reprovado).toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  test('deve retornar 400 se ocorrer erro ao reprovar usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
+    it("retorna 404 se aula não existir", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      (Aula.findById as jest.Mock).mockResolvedValue(null);
+      req.params = { aulaId: "507f1f77bcf86cd799439011", conteudoId: "507f1f77bcf86cd799439012" };
+      await deletarConteudo(req as Request, res as Response);
+      expect(status).toHaveBeenCalledWith(404);
     });
 
-    await reprovarUsuario(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  // =========================
-  // promover / despromover admin
-  // =========================
-  test('deve retornar 404 se usuário não existir ao promover', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
-    await promoverAdmin(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve promover usuário a admin', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({
-      email: 'test@test.com',
-      nome: 'Lucas'
+    it("retorna 404 se conteúdo não existir", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      const aulaMock: any = { conteudos: { id: jest.fn().mockReturnValue(null) } };
+      (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
+      req.params = { aulaId: "507f1f77bcf86cd799439011", conteudoId: "507f1f77bcf86cd799439012" };
+      await deletarConteudo(req as Request, res as Response);
+      expect(status).toHaveBeenCalledWith(404);
     });
 
-    await promoverAdmin(req, res as Response);
+    it("deleta conteúdo corretamente", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      const aulaMock: any = { conteudos: { id: jest.fn().mockReturnValue({ _id: "x" }), pull: jest.fn() }, save: jest.fn() };
+      (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
 
-    expect(emailService.promovidoAdmin).toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
+      req.params = { aulaId: "507f1f77bcf86cd799439011", conteudoId: "507f1f77bcf86cd799439012" };
+      await deletarConteudo(req as Request, res as Response);
 
-  test('deve retornar 400 se ocorrer erro ao promover usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
+      expect(aulaMock.conteudos.pull).toHaveBeenCalled();
+      expect(aulaMock.save).toHaveBeenCalled();
+      expect(status).toHaveBeenCalledWith(200);
     });
 
-    await promoverAdmin(req, res as Response);
+    it("conteudoId como array", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      const aulaMock: any = { conteudos: { id: jest.fn().mockReturnValue({ _id: "x" }), pull: jest.fn() }, save: jest.fn() };
+      (Aula.findById as jest.Mock).mockResolvedValue(aulaMock);
 
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
+      req.params = { aulaId: ["507f1f77bcf86cd799439011"], conteudoId: ["507f1f77bcf86cd799439012"] };
+      await deletarConteudo(req as Request, res as Response);
 
-  test('deve retornar 404 se usuário não existir ao despromover', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue(null);
-
-    await despromoverAdmin(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  test('deve despromover admin', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockResolvedValue({
-      email: 'test@test.com',
-      nome: 'Lucas'
+      expect(aulaMock.conteudos.pull).toHaveBeenCalled();
+      expect(status).toHaveBeenCalledWith(200);
     });
 
-    await despromoverAdmin(req, res as Response);
-
-    expect(emailService.despromovidoAdmin).toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  test('deve retornar 400 se ocorrer erro ao despromover usuário', async () => {
-    req.params.id = '123';
-
-    (Usuario.findByIdAndUpdate as jest.Mock).mockImplementation(() => {
-      throw new Error();
+    it("retorna 500 se ocorrer erro", async () => {
+      jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+      (Aula.findById as jest.Mock).mockRejectedValue(new Error());
+      req.params = { aulaId: "507f1f77bcf86cd799439011", conteudoId: "507f1f77bcf86cd799439012" };
+      await deletarConteudo(req as Request, res as Response);
+      expect(status).toHaveBeenCalledWith(500);
     });
-
-    await despromoverAdmin(req, res as Response);
-
-    expect(res.status).toHaveBeenCalledWith(400);
   });
 });

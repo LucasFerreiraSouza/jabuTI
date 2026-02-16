@@ -1,20 +1,34 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import request from 'supertest';
 import aulasRoutes from '../../routes/aulas.routes';
 
 jest.mock('../../controllers/aulas.controller', () => ({
-  listarAulas: jest.fn((req, res) => res.status(200).json([])),
-  buscarAulaPorId: jest.fn((req, res) => res.status(200).json({})),
-  criarAula: jest.fn((req, res) => res.status(201).json({})),
-  atualizarAula: jest.fn((req, res) => res.status(200).json({})),
-  deletarAula: jest.fn((req, res) => res.status(200).json({}))
+  listarAulas: jest.fn((req: Request, res: Response) =>
+    res.status(200).json([])
+  ),
+  buscarAulaPorId: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({})
+  ),
+  criarAula: jest.fn((req: Request, res: Response) =>
+    res.status(201).json({})
+  ),
+  atualizarAula: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({})
+  ),
+  deletarAula: jest.fn((req: Request, res: Response) =>
+    res.status(200).json({})
+  )
 }));
 
 jest.mock('../../middlewares/auth', () => ({
-  auth: (req: any, _res: any, next: any) => {
-    req.userId = 'user123';
+  auth: (req: Request, _res: Response, next: NextFunction) => {
+    (req as any).user = { id: 'user123', role: 'ADMIN' };
     next();
   }
+}));
+
+jest.mock('../../middlewares/adminOnly', () => ({
+  adminOnly: (_req: Request, _res: Response, next: NextFunction) => next()
 }));
 
 describe('aulas.routes', () => {
@@ -26,11 +40,15 @@ describe('aulas.routes', () => {
   });
 
   test('GET /aulas deve listar aulas', async () => {
-    await request(app).get('/aulas').expect(200);
+    await request(app)
+      .get('/aulas')
+      .expect(200);
   });
 
   test('GET /aulas/:id deve buscar aula por id', async () => {
-    await request(app).get('/aulas/123').expect(200);
+    await request(app)
+      .get('/aulas/123')
+      .expect(200);
   });
 
   test('POST /aulas deve criar aula (rota protegida)', async () => {

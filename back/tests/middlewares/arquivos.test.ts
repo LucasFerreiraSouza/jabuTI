@@ -1,45 +1,21 @@
-import { adminOnly } from '../../middlewares/adminOnly';
-import { Response } from 'express';
+import { upload } from '../../middlewares/arquivos';
 
-describe('adminOnly middleware', () => {
-  const mockRes = () => {
-    const res: Partial<Response> = {};
-    res.status = jest.fn().mockReturnValue(res);
-    res.json = jest.fn().mockReturnValue(res);
-    return res as Response;
-  };
+describe('middlewares/arquivos (multer upload)', () => {
 
-  it('deve retornar 401 se usuário não autenticado', () => {
-    const req: any = {};
-    const res = mockRes();
-    const next = jest.fn();
-
-    adminOnly(req, res, next);
-
-    expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ erro: 'Usuário não autenticado' });
-    expect(next).not.toHaveBeenCalled();
+  it('deve exportar o objeto upload', () => {
+    expect(upload).toBeDefined();
   });
 
-  it('deve retornar 403 se usuário não for ADMIN', () => {
-    const req: any = { user: { role: 'ESTUDANTE' } };
-    const res = mockRes();
-    const next = jest.fn();
-
-    adminOnly(req, res, next);
-
-    expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({ erro: 'Acesso restrito a administradores' });
-    expect(next).not.toHaveBeenCalled();
+  it('deve possuir o método single', () => {
+    expect(typeof upload.single).toBe('function');
   });
 
-  it('deve chamar next se for ADMIN', () => {
-    const req: any = { user: { role: 'ADMIN' } };
-    const res = mockRes();
-    const next = jest.fn();
+  it('upload.single deve retornar um middleware', () => {
+    const middleware = upload.single('file');
 
-    adminOnly(req, res, next);
-
-    expect(next).toHaveBeenCalled();
+    expect(typeof middleware).toBe('function');
+    // middleware do express sempre recebe (req, res, next)
+    expect(middleware.length).toBeGreaterThanOrEqual(2);
   });
+
 });
