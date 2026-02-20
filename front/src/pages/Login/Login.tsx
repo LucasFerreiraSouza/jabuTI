@@ -1,8 +1,32 @@
+// C:\Users\AGX\Desktop\jabuTI\front\src\pages\Login\Login.tsx
+
 import { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import ReCAPTCHA from "react-google-recaptcha";
 import { authService } from "../../services/auth.service";
 
+/* ============================
+   Helpers
+============================ */
+
+function getRoleFromToken(
+  token: string
+): "ADMIN" | "ESTUDANTE"| null {
+  try {
+    const payload = token.split(".")[1];
+    const decoded = JSON.parse(atob(payload));
+    return decoded.role ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/* ============================
+   Component
+============================ */
+
 export default function Login() {
+  const navigate = useNavigate();
   const recaptchaRef = useRef<ReCAPTCHA>(null);
 
   const [email, setEmail] = useState("");
@@ -13,7 +37,7 @@ export default function Login() {
 
   const [usuarioId2FA, setUsuarioId2FA] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     setErro(null);
@@ -24,7 +48,6 @@ export default function Login() {
 
       if (!captchaToken) {
         setErro("Confirme o captcha");
-        setLoading(false);
         return;
       }
 
@@ -36,22 +59,33 @@ export default function Login() {
 
       const data = response.data;
 
-      // login sem 2FA
+      /* ============================
+         Login sem 2FA
+      ============================ */
       if (data.token) {
         localStorage.setItem("token", data.token);
-        alert("Login realizado com sucesso!");
+
+        const role = getRoleFromToken(data.token);
+
+        if (role === "ADMIN") {
+          navigate("/aulas-admin");
+        } else {
+          // ESTUDANTE
+          navigate("/aulas-estudantes");
+        }
+
         return;
       }
 
-      // login com 2FA
+      /* ============================
+         Login com 2FA
+      ============================ */
       if (data.usuarioId) {
         setUsuarioId2FA(data.usuarioId);
         alert(data.mensagem || "Código enviado para o e-mail");
       }
 
-      // limpa o captcha após tentativa
       recaptchaRef.current?.reset();
-
     } catch (err: any) {
       setErro(err?.response?.data?.erro || "Erro ao realizar login");
       recaptchaRef.current?.reset();
@@ -107,7 +141,17 @@ export default function Login() {
 
       {usuarioId2FA && (
         <div style={{ marginTop: 20 }}>
-          <p>Usuário com 2FA. Verifique seu e-mail.</p>
+          <p>
+            Este usuário possui verificação em duas etapas.
+            <br />
+            Um código foi enviado para o e-mail.
+          </p>
+
+          {/*
+            Aqui depois você pode criar a tela / componente
+            para chamar:
+            authService.confirmarCodigo(...)
+          */}
         </div>
       )}
     </div>

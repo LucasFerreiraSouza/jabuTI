@@ -59,7 +59,7 @@ const UsuarioSchema = new Schema<IUsuario>(
 
     role: {
       type: String,
-      enum: ['ESTUDANTE', 'PROFESSOR', 'ADMIN'],
+      enum: ['ESTUDANTE', 'ADMIN'],
       default: 'ESTUDANTE',
       index: true
     },
