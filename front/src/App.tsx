@@ -4,6 +4,8 @@ import Login from "./pages/Login/Login";
 import AulasVisitantes from "./pages/AulasVisitantes/AulasVisitantes";
 import AulasEstudantes from "./pages/AulasEstudantes/AulasEstudantes";
 import AulasAdmin from "./pages/AulasAdmin/AulasAdmin";
+import AtivarSenha from "./pages/AtivarSenha/AtivarSenha";
+
 
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
@@ -34,6 +36,11 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+
+          <Route
+            path="/ativar-senha"
+            element={<AtivarSenha />}
+          />
 
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
